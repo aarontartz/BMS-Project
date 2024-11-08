@@ -1,1 +1,1 @@
-Contains code for prototype activity 1
+Contains LTSpice simulations for prototype activity 1

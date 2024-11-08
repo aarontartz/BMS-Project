@@ -1,2 +1,2 @@
-# bms
-Shared repository for BMS project files
+# BMS-Project
+Shared repository for all BMS project files

@@ -1,56 +1,69 @@
-from tkinter import *
-import random
+import tkinter as tk
+import threading
+import time
 
-'''
-ATM this is just generating random data and updating the display every 10 seconds. Currently working
-on integrating command line inputs to update the display. The buttons are just placeholders for now.
-'''
+class App:
+    def __init__(self, root):
+        self.root = root
+        self.root.geometry("1200x300")
+        self.root.title("Voltage and Current Monitor")
 
-root = Tk()
-root.geometry("1000x1000")
-root.configure(bg="black")
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_rowconfigure(1, weight=1)
+        self.root.grid_rowconfigure(2, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
+        self.root.grid_columnconfigure(1, weight=1)
 
-def sum_function(a, b):
-    return a + b
+        label_font = ("Helvetica", 36)
+        value_font = ("Helvetica", 36)
 
-def update_label():
-    a = random.randint(1, 100)
-    b = random.randint(1, 100)
-    result = sum_function(a, b)
-    label.config(text=f"Voltage: {result}V")
-    root.after(10000, update_label)
+        self.voltage_label = tk.Label(root, text="Voltage", font=label_font, anchor="e")
+        self.voltage_label.grid(row=0, column=0, padx=10, pady=10, sticky="e")
+        self.voltage_value = tk.Entry(root, font=value_font, bd=0, state='readonly', readonlybackground=self.root.cget("bg"))
+        self.voltage_value.grid(row=0, column=1, padx=10, pady=10, sticky="w")
 
-label = Label(root, text="Voltage: ", font=("Helvetica", 30), fg="white", bg="black")
-label.place(relx=0.5, rely=0.5, anchor=CENTER)
+        self.current_label = tk.Label(root, text="Current", font=label_font, anchor="e")
+        self.current_label.grid(row=1, column=0, padx=10, pady=10, sticky="e")
+        self.current_value = tk.Entry(root, font=value_font, bd=0, state='readonly', readonlybackground=self.root.cget("bg"))
+        self.current_value.grid(row=1, column=1, padx=10, pady=10, sticky="w")
 
-def product_function(a, b):
-    return a * b
+        self.temperature_label = tk.Label(root, text="Temperature", font=label_font, anchor="e")
+        self.temperature_label.grid(row=2, column=0, padx=10, pady=10, sticky="e")
+        self.temperature_value = tk.Entry(root, font=value_font, bd=0, state='readonly', readonlybackground=self.root.cget("bg"))
+        self.temperature_value.grid(row=2, column=1, padx=10, pady=10, sticky="w")
 
-def update_product_label():
-    a = random.randint(1, 100)
-    b = random.randint(1, 100)
-    result = product_function(a, b)
-    product_label.config(text=f"Power: {result}W")
-    root.after(10000, update_product_label)
+        self.update_values()
 
-product_label = Label(root, text="Power: ", font=("Helvetica", 30), fg="white", bg="black")
-product_label.place(relx=0.5, rely=0.6, anchor=CENTER)
+    def update_values(self):
+        try:
+            with open('input_text.txt', 'r') as file:
+                lines = file.readlines()
+                if lines:
+                    last_line = lines[-1].strip().split()
+                    voltage = last_line[0]
+                    current = last_line[1]
+                    temperature = last_line[2]
 
-update_label()
-update_product_label()
+                    self.voltage_value.configure(state='normal')
+                    self.voltage_value.delete(0, tk.END)
+                    self.voltage_value.insert(0, voltage + " V")
+                    self.voltage_value.configure(state='readonly')
 
-def create_oval_button(text, command, bg, fg):
-    button = Button(root, text=text, command=command, bg=bg, fg=fg, font=("Helvetica", 20), relief=FLAT)
-    button.place(relx=0.9, rely=0.1 if text == "Read" else 0.2, anchor=NE)
-    return button
+                    self.current_value.configure(state='normal')
+                    self.current_value.delete(0, tk.END)
+                    self.current_value.insert(0, current + " A")
+                    self.current_value.configure(state='readonly')
 
-def read_action():
-    print("Read button clicked")
+                    self.temperature_value.configure(state='normal')
+                    self.temperature_value.delete(0, tk.END)
+                    self.temperature_value.insert(0, temperature + " Degrees")
+                    self.temperature_value.configure(state='readonly')
+        except Exception as e:
+            print(f"Error reading file: {e}")
 
-def write_action():
-    print("Write button clicked")
+        self.root.after(1000, self.update_values)
 
-read_button = create_oval_button("Read", read_action, "white", "blue")
-write_button = create_oval_button("Write", write_action, "blue", "white")
-
-root.mainloop()
+while(1):
+    root = tk.Tk()
+    app = App(root)
+    root.mainloop()

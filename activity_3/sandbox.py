@@ -1,39 +1,72 @@
-from tkinter import *
-import os
+import tkinter as tk
+import threading
+import time
 
-print("Current working directory:", os.getcwd())
+class App:
+    def __init__(self, root):
+        self.root = root
+        self.root.geometry("1200x300")
+        self.root.title("Voltage and Current Monitor")
 
-root = Tk()
-root.geometry("500x300")
-root.title("Command Line Display")
-root.configure(bg="black")
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_rowconfigure(1, weight=1)
+        self.root.grid_rowconfigure(2, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
+        self.root.grid_columnconfigure(1, weight=1)
 
-input_file = "input_text.txt"
+        label_font = ("Helvetica", 36)
+        value_font = ("Helvetica", 36)
 
-label = Label(root, text="Waiting for input...", font=("Helvetica", 20), fg="white", bg="black")
-label.pack(expand=True)
+        self.voltage_label = tk.Label(root, text="Voltage", font=label_font, anchor="e")
+        self.voltage_label.grid(row=0, column=0, padx=10, pady=10, sticky="e")
+        self.voltage_value = tk.Entry(root, font=value_font, bd=0, state='readonly', readonlybackground=self.root.cget("bg"))
+        self.voltage_value.grid(row=0, column=1, padx=10, pady=10, sticky="w")
 
-last_text = ""
+        self.current_label = tk.Label(root, text="Current", font=label_font, anchor="e")
+        self.current_label.grid(row=1, column=0, padx=10, pady=10, sticky="e")
+        self.current_value = tk.Entry(root, font=value_font, bd=0, state='readonly', readonlybackground=self.root.cget("bg"))
+        self.current_value.grid(row=1, column=1, padx=10, pady=10, sticky="w")
 
-def check_for_update():
-    global last_text
-    try:
-        if os.path.exists(input_file):
-            with open(input_file, "r") as file:
-                new_text = file.readline().strip()
-                print(f"Read from file: '{new_text}'")
-                if new_text and new_text != last_text:
-                    label.config(text=new_text)
-                    last_text = new_text
-                    print(f"Updated to: '{new_text}'")
-                elif not new_text:
-                    print("No new input found in file")
-        else:
-            print(f"File '{input_file}' doen't exist")
-    except Exception as e:
-        print(f"Error reading the file: {e}")
+        self.temperature_label = tk.Label(root, text="Temperature", font=label_font, anchor="e")
+        self.temperature_label.grid(row=2, column=0, padx=10, pady=10, sticky="e")
+        self.temperature_value = tk.Entry(root, font=value_font, bd=0, state='readonly', readonlybackground=self.root.cget("bg"))
+        self.temperature_value.grid(row=2, column=1, padx=10, pady=10, sticky="w")
 
-    root.after(1000, check_for_update)
+        self.update_values()
 
-check_for_update()
-root.mainloop()
+    def update_values(self):
+        try:
+            with open('input_text.txt', 'r') as file:
+                lines = file.readlines()
+                if lines:
+                    last_line = lines[-1].strip().split()
+                    voltage = last_line[0]
+                    current = last_line[1]
+                    temperature = last_line[2]
+
+                    self.voltage_value.configure(state='normal')
+                    self.voltage_value.delete(0, tk.END)
+                    self.voltage_value.insert(0, voltage + " V")
+                    self.voltage_value.configure(state='readonly')
+
+                    self.current_value.configure(state='normal')
+                    self.current_value.delete(0, tk.END)
+                    self.current_value.insert(0, current + " A")
+                    self.current_value.configure(state='readonly')
+
+                    self.temperature_value.configure(state='normal')
+                    self.temperature_value.delete(0, tk.END)
+                    self.temperature_value.insert(0, temperature + " Degrees")
+                    self.temperature_value.configure(state='readonly')
+        except Exception as e:
+            print(f"Error reading file: {e}")
+
+        self.root.after(1000, self.update_values)
+
+    def RS485_to_decimal(self, data):
+        # Convert RS485 data to decimal. Still working on this. 
+
+while(1):
+    root = tk.Tk()
+    app = App(root)
+    root.mainloop()

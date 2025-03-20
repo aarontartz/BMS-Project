@@ -1,1 +1,1 @@
-(i clearly did not write much of this code myself)
+awesome ui i coded all by myself

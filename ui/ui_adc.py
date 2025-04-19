@@ -1,7 +1,7 @@
 import sys
 import time
 import spidev
-import RPi.GPIO as GPIO
+from gpiozero import DigitalOutputDevice
 from collections import deque
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QGroupBox, QFormLayout
 from PyQt5.QtCore import QTimer
@@ -82,10 +82,7 @@ class MainWindow(QMainWindow):
         self.volt_max=14.6
 
     def init_safety(self):
-        self.KILL_PIN=26
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self.KILL_PIN,GPIO.OUT)
-        GPIO.output(self.KILL_PIN,GPIO.HIGH)
+        self.kill=DigitalOutputDevice(26,active_high=True,initial_value=True)
         self.MAX_TEMP=60.0
         self.RED_TEMP=75.0
         self.MAX_CURRENT=5.0
@@ -139,11 +136,10 @@ class MainWindow(QMainWindow):
             avg_v=sum(self.voltage_buf)/self.buf_size
             yellow_trip=(avg_t>self.MAX_TEMP or avg_i>self.MAX_CURRENT or avg_v>self.MAX_VOLTAGE)
         if red_trip:
-            GPIO.output(self.KILL_PIN,GPIO.LOW)
+            self.kill.off()
         else:
-            GPIO.output(self.KILL_PIN,GPIO.HIGH)
+            self.kill.on()
 
-        #status colors
         def status(raw,buf,max_l,red_l):
             if raw>red_l:
                 return 'RED','color:red;'
@@ -158,9 +154,7 @@ class MainWindow(QMainWindow):
         self.voltage_status.setText(s_v);self.voltage_status.setStyleSheet(c_v)
 
     def closeEvent(self,event):
-        self.spi.close()
-        GPIO.output(self.KILL_PIN,GPIO.LOW)
-        GPIO.cleanup()
+        self.kill.off()
         event.accept()
 
 if __name__=='__main__':

@@ -1,13 +1,36 @@
-sudo tee /etc/systemd/system/pigpiod.service > /dev/null << 'EOF'
-[Unit]
-Description=Daemon for pigpio GPIO interface
-After=network.target
+QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-root'
+/usr/lib/python3/dist-packages/gpiozero/devices.py:300: PinFactoryFallback: Falling back from lgpio: 'can not open gpiochip'
+  warnings.warn(
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/gpiozero/pins/pi.py", line 411, in pin
+    pin = self.pins[info]
+          ~~~~~~~~~^^^^^^
+KeyError: PinInfo(number=37, name='GPIO26', names=frozenset({'BOARD37', 'WPI25', 'GPIO26', '26', 'J8:37', 26, 'BCM26'}), pull='', row=19, col=1, interfaces=frozenset({'', 'spi', 'jtag', 'gpio', 'dpi', 'sdio'}))
 
-[Service]
-Type=simple
-ExecStart=/usr/local/sbin/pigpiod -l
-User=root
+During handling of the above exception, another exception occurred:
 
-[Install]
-WantedBy=multi-user.target
-EOF
+Traceback (most recent call last):
+  File "/home/bms/ui_adc.py", line 198, in <module>
+    w = MainWindow()
+        ^^^^^^^^^^^^
+  File "/home/bms/ui_adc.py", line 105, in __init__
+    self.kill = DigitalOutputDevice(26, initial_value=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/gpiozero/devices.py", line 108, in __call__
+    self = super().__call__(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/gpiozero/output_devices.py", line 192, in __init__
+    super().__init__(pin, active_high=active_high,
+  File "/usr/lib/python3/dist-packages/gpiozero/output_devices.py", line 74, in __init__
+    super().__init__(pin, pin_factory=pin_factory)
+  File "/usr/lib/python3/dist-packages/gpiozero/mixins.py", line 75, in __init__
+    super().__init__(*args, **kwargs)
+  File "/usr/lib/python3/dist-packages/gpiozero/devices.py", line 553, in __init__
+    pin = self.pin_factory.pin(pin)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/gpiozero/pins/pi.py", line 413, in pin
+    pin = self.pin_class(self, info)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/gpiozero/pins/rpigpio.py", line 101, in __init__
+    GPIO.setup(self._number, GPIO.IN, self.GPIO_PULL_UPS[self._pull])
+RuntimeError: Cannot determine SOC peripheral base address

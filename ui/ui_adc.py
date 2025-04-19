@@ -95,8 +95,8 @@ class MainWindow(QMainWindow):
         self.spi.max_speed_hz = 1_350_000
 
         #parameters for SOC mapping
-        self.volt_min = 300.0 #pack voltage at 0% SOC
-        self.volt_max = 420.0 #pack voltage at 100% SOC
+        self.volt_min = 11.2 #pack voltage at 0% SOC
+        self.volt_max = 14.6 #pack voltage at 100% SOC
 
     def init_timer(self):
         #update every second
@@ -127,7 +127,7 @@ class MainWindow(QMainWindow):
         #voltage
         raw_v = self.read_adc_raw(2)
         v_s   = (raw_v / 1024.0) * 5.0
-        batt_v = v_s * 4.8
+        batt_v = v_s * 2.5
         self.voltage_label.setText(f"{batt_v:.2f}")
 
         soc = (batt_v - self.volt_min) / (self.volt_max - self.volt_min) * 100.0

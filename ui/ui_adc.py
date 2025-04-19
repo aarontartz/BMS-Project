@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from gpiozero.pins.linux import LinuxGPIOFactory
 from gpiozero import Device
+
+# Force gpiozero to use /dev/gpiochip* via libgpiod
 Device.pin_factory = LinuxGPIOFactory()
 
 import sys
@@ -41,8 +43,8 @@ class BatteryCanvas(FigureCanvas):
         self.time_history.append(t_new)
         self.soc_history.append(soc)
         if len(self.soc_history) > self.max_points:
-            self.soc_history = self.soc_history[-self.max_points :]
-            self.time_history = self.time_history[-self.max_points :]
+            self.soc_history = self.soc_history[-self.max_points:]
+            self.time_history = self.time_history[-self.max_points:]
         self.line.set_data(self.time_history, self.soc_history)
         self.axes.set_xlim(
             self.time_history[0], self.time_history[-1] * 1.05
@@ -67,18 +69,18 @@ class MainWindow(QMainWindow):
         # ADC readings + status
         box = QGroupBox("Local ADC Readings")
         form = QFormLayout()
-        self.voltage_label = QLabel("N/A")
+        self.voltage_label  = QLabel("N/A")
         self.voltage_status = QLabel("N/A")
-        self.current_label = QLabel("N/A")
+        self.current_label  = QLabel("N/A")
         self.current_status = QLabel("N/A")
-        self.temp_label = QLabel("N/A")
-        self.temp_status = QLabel("N/A")
+        self.temp_label     = QLabel("N/A")
+        self.temp_status    = QLabel("N/A")
         form.addRow("Battery Voltage (V):", self.voltage_label)
-        form.addRow("Voltage Status:", self.voltage_status)
-        form.addRow("Load Current (A):", self.current_label)
-        form.addRow("Current Status:", self.current_status)
-        form.addRow("Temp (°F):", self.temp_label)
-        form.addRow("Temp Status:", self.temp_status)
+        form.addRow("Voltage Status:",       self.voltage_status)
+        form.addRow("Load Current (A):",     self.current_label)
+        form.addRow("Current Status:",       self.current_status)
+        form.addRow("Temp (°F):",            self.temp_label)
+        form.addRow("Temp Status:",          self.temp_status)
         box.setLayout(form)
         layout.addWidget(box)
 
@@ -93,8 +95,8 @@ class MainWindow(QMainWindow):
         self.volt_max = 14.6
 
         # Safety thresholds
-        self.MAX_TEMP = 60.0
-        self.RED_TEMP = 75.0
+        self.MAX_TEMP    = 60.0
+        self.RED_TEMP    = 75.0
         self.MAX_CURRENT = 5.0
         self.RED_CURRENT = 7.0
         self.MAX_VOLTAGE = 4.2
@@ -109,7 +111,7 @@ class MainWindow(QMainWindow):
         # kill-switch output on BCM26 (start HIGH = safe)
         self.kill = DigitalOutputDevice(26, initial_value=True)
 
-        # periodic update
+        # periodic update every 1 s
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_readings)
         self.timer.start(1000)
@@ -156,7 +158,7 @@ class MainWindow(QMainWindow):
         self.buf_i.append(i_a)
         self.buf_v.append(b_v)
 
-        # Compute rolling-average warning
+        # Rolling-average warning
         yellow = False
         if len(self.buf_t) == self.buf_t.maxlen:
             at = sum(self.buf_t) / len(self.buf_t)
@@ -170,9 +172,9 @@ class MainWindow(QMainWindow):
 
         # Drive kill‑switch pin
         if red:
-            self.kill.off()   # pull LOW → unsafe
+            self.kill.off()   # LOW = unsafe
         else:
-            self.kill.on()    # drive HIGH → safe
+            self.kill.on()    # HIGH = safe
 
         # Update status labels
         def status(val, buf, max_l, red_l):
@@ -186,12 +188,9 @@ class MainWindow(QMainWindow):
         st_i, ci = status(i_a, self.buf_i, self.MAX_CURRENT, self.RED_CURRENT)
         st_v, cv = status(b_v, self.buf_v, self.MAX_VOLTAGE, self.RED_VOLTAGE)
 
-        self.temp_status.setText(st_t)
-        self.temp_status.setStyleSheet(ct)
-        self.current_status.setText(st_i)
-        self.current_status.setStyleSheet(ci)
-        self.voltage_status.setText(st_v)
-        self.voltage_status.setStyleSheet(cv)
+        self.temp_status.setText(st_t);    self.temp_status.setStyleSheet(ct)
+        self.current_status.setText(st_i); self.current_status.setStyleSheet(ci)
+        self.voltage_status.setText(st_v); self.voltage_status.setStyleSheet(cv)
 
     def closeEvent(self, event):
         # Ensure kill‑switch goes LOW on exit

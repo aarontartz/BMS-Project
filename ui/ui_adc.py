@@ -11,7 +11,6 @@ from PyQt5.QtCore import QTimer
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-# ─── GPIO26 “kill‑switch” setup via libgpiod ──────────────────────────
 chip      = gpiod.Chip('gpiochip0')
 kill_line = chip.get_line(26)
 kill_line.request(
@@ -97,7 +96,7 @@ class MainWindow(QMainWindow):
         # Safety thresholds
         self.MAX_TEMP    = 60.0; self.RED_TEMP    = 75.0
         self.MAX_CURRENT = 5.0;  self.RED_CURRENT = 7.0
-        self.MAX_VOLTAGE = 4.2;  self.RED_VOLTAGE = 4.5
+        self.MAX_VOLTAGE = 14.2;  self.RED_VOLTAGE = 14.6 #CHANGE LATER
 
         # rolling buffers
         size = 5
@@ -131,7 +130,7 @@ class MainWindow(QMainWindow):
 
         r_v = self.read_raw(2)
         v_s = r_v / 1024.0 * 5.0
-        b_v = v_s * (12.0/5.0)
+        b_v = v_s * (self.volt_max / 5.0)
         self.voltage_label.setText(f"{b_v:.2f}")
 
         # SOC

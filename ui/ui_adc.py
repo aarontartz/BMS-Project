@@ -1,3 +1,10 @@
+#!/usr/bin/env python3
+from gpiozero.pins.native import NativeFactory
+from gpiozero import Device
+
+# stick gpiod-based backend in for everything
+Device.pin_factory = NativeFactory()
+
 import sys
 import spidev
 from collections import deque
@@ -8,12 +15,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import QTimer
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-#from gpiozero import DigitalOutputDevice
-from gpiozero.pins.native import NativeFactory
-from gpiozero import Device
-
-# stick gpiod-based backend in for everything
-Device.pin_factory = NativeFactory()
+from gpiozero import DigitalOutputDevice
 
 class BatteryCanvas(FigureCanvas):
     def __init__(self):

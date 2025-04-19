@@ -11,7 +11,7 @@ from PyQt5.QtCore import QTimer
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-#GPIO setup: line 26 as output, default LOW
+#GPIO setup: line 26 as open‑drain output, default LOW
 chip      = gpiod.Chip('gpiochip0')
 kill_line = chip.get_line(26)
 kill_line.request(
@@ -95,8 +95,8 @@ class MainWindow(QMainWindow):
         self.volt_max = 14.6  # UPDATE LATER IF NEEDED
 
         # safety thresholds
-        self.MAX_TEMP    = 60.0;  self.RED_TEMP    = 75.0  # UPDATE LATER IF NEEDED
-        self.MAX_CURRENT = 5.0;   self.RED_CURRENT = 7.0  # UPDATE LATER IF NEEDED
+        self.MAX_TEMP    = 70.0;  self.RED_TEMP    = 80.0  # UPDATE LATER IF NEEDED
+        self.MAX_CURRENT = 4.0;   self.RED_CURRENT = 4.5  # UPDATE LATER IF NEEDED
         self.MAX_VOLTAGE = 14.0;  self.RED_VOLTAGE = 14.5  # UPDATE LATER IF NEEDED
 
         # rolling buffers

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import sys
 import spidev
 import gpiod
@@ -11,12 +10,14 @@ from PyQt5.QtCore import QTimer
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
+#GPIO setup: line 26 as open‑drain output, default LOW
 chip      = gpiod.Chip('gpiochip0')
 kill_line = chip.get_line(26)
 kill_line.request(
     consumer="battery_monitor",
     type=gpiod.LINE_REQ_DIR_OUT,
-    default_vals=[1]    # start HIGH = “safe”
+    flags=gpiod.LINE_REQ_FLAG_OPEN_DRAIN,
+    default_vals=[0]
 )
 
 class BatteryCanvas(FigureCanvas):
@@ -89,14 +90,14 @@ class MainWindow(QMainWindow):
         self.spi.max_speed_hz = 1_350_000
         self.spi.mode = 0b00
 
-        # LiFePO4 pack bounds (11.2–14.6V)
-        self.volt_min = 11.2
-        self.volt_max = 14.6
+        # battery pack bounds (11.2–14.6V)
+        self.volt_min = 11.2  # UPDATE LATER IF NEEDED
+        self.volt_max = 14.6  # UPDATE LATER IF NEEDED
 
-        # Safety thresholds
-        self.MAX_TEMP    = 60.0; self.RED_TEMP    = 75.0
-        self.MAX_CURRENT = 5.0;  self.RED_CURRENT = 7.0
-        self.MAX_VOLTAGE = 14.0;  self.RED_VOLTAGE = 14.5 #CHANGE LATER
+        # safety thresholds
+        self.MAX_TEMP    = 60.0;  self.RED_TEMP    = 75.0  # UPDATE LATER IF NEEDED
+        self.MAX_CURRENT = 5.0;   self.RED_CURRENT = 7.0  # UPDATE LATER IF NEEDED
+        self.MAX_VOLTAGE = 14.2;  self.RED_VOLTAGE = 14.6  # UPDATE LATER IF NEEDED
 
         # rolling buffers
         size = 5
@@ -138,7 +139,7 @@ class MainWindow(QMainWindow):
         soc = max(0, min(100, soc))
         self.canvas.update_soc(soc, 1)
 
-        # --- safety logic ---
+        # safety logic
         red = (t_c > self.RED_TEMP) or (i_a > self.RED_CURRENT) or (b_v > self.RED_VOLTAGE)
         self.buf_t.append(t_c); self.buf_i.append(i_a); self.buf_v.append(b_v)
 
@@ -150,8 +151,8 @@ class MainWindow(QMainWindow):
         else:
             yellow = False
 
-        # drive kill‑switch: LOW if red, HIGH otherwise
-        kill_line.set_value(0 if red else 1)
+        # drive kill‑switch: LOW (0 V) when safe, HIGH‑Z -> pulled to 5 V when RED
+        kill_line.set_value(int(red))
 
         # update status labels
         def status(val, buf, max_l, red_l):
@@ -170,7 +171,7 @@ class MainWindow(QMainWindow):
         self.voltage_status.setText(st_v); self.voltage_status.setStyleSheet(cv)
 
     def closeEvent(self, event):
-        # ensure kill‑switch pin goes LOW on exit
+        # ensure kill‑switch goes LOW on exit
         kill_line.set_value(0)
         event.accept()
 

@@ -1,0 +1,13 @@
+sudo tee /etc/systemd/system/pigpiod.service > /dev/null << 'EOF'
+[Unit]
+Description=Daemon for pigpio GPIO interface
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/pigpiod -l
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF

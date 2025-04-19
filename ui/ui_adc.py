@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-from gpiozero.pins.native import NativeFactory
+from gpiozero.pins.linux import LinuxGPIOFactory
 from gpiozero import Device
-
-# stick gpiod-based backend in for everything
-Device.pin_factory = NativeFactory()
+Device.pin_factory = LinuxGPIOFactory()
 
 import sys
 import spidev

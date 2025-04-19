@@ -1,12 +1,19 @@
 import sys
 import time
 import spidev
-from gpiozero import DigitalOutputDevice
+from gpiozero import Device, DigitalOutputDevice
+from gpiozero.pins.native import NativeFactory
 from collections import deque
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QGroupBox, QFormLayout
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout,
+    QLabel, QGroupBox, QFormLayout
+)
 from PyQt5.QtCore import QTimer
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+
+# use native pin factory on Ubuntu
+Device.pin_factory = NativeFactory()
 
 #SOCplot
 class BatteryCanvas(FigureCanvas):
@@ -54,8 +61,10 @@ class MainWindow(QMainWindow):
         central=QWidget()
         self.setCentralWidget(central)
         layout=QVBoxLayout(central)
+
         self.battery_canvas=BatteryCanvas(width=6,height=3)
         layout.addWidget(self.battery_canvas)
+
         readings=QGroupBox('Local ADC Readings')
         form=QFormLayout()
         self.voltage_label=QLabel('N/A')
@@ -112,14 +121,17 @@ class MainWindow(QMainWindow):
         temp_c=100.0*(v_t-0.75)+25.0
         temp_f=temp_c*9/5+32
         self.temp_label.setText(f"{temp_f:.1f}")
+
         raw_i=self.read_adc_raw(4)
         v_i=raw_i/1024.0*5.0
         current=(v_i-2.5)/0.1375-1.0
         self.current_label.setText(f"{current:.2f}")
+
         raw_v=self.read_adc_raw(2)
         v_s=raw_v/1024.0*5.0
         batt_v=v_s*(12.0/5.0)
         self.voltage_label.setText(f"{batt_v:.2f}")
+
         soc=(batt_v-self.volt_min)/(self.volt_max-self.volt_min)*100
         soc=max(0,min(100,soc))
         self.battery_canvas.update_soc(soc,dt=1)

@@ -12,13 +12,13 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 # ─── GPIO26 “kill‑switch” setup via libgpiod ──────────────────────────
-chip     = gpiod.Chip('gpiochip0')
-kill_line= chip.get_line(26)
-config   = gpiod.LineRequest()
-config.consumer     = "battery_monitor"
-config.request_type = gpiod.LINE_REQ_DIR_OUT
-config.default_vals = [1]   # start HIGH = “safe”
-kill_line.request(config)
+chip      = gpiod.Chip('gpiochip0')
+kill_line = chip.get_line(26)
+kill_line.request(
+    consumer="battery_monitor",
+    type=gpiod.LINE_REQ_DIR_OUT,
+    default_vals=[1]    # start HIGH = “safe”
+)
 
 class BatteryCanvas(FigureCanvas):
     def __init__(self):

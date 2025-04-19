@@ -127,7 +127,7 @@ class MainWindow(QMainWindow):
         #voltage
         raw_v = self.read_adc_raw(2)
         v_s   = (raw_v / 1024.0) * 5.0
-        batt_v = v_s * 2.5
+        batt_v = v_s * (self.volt_max / 5.0)
         self.voltage_label.setText(f"{batt_v:.2f}")
 
         soc = (batt_v - self.volt_min) / (self.volt_max - self.volt_min) * 100.0

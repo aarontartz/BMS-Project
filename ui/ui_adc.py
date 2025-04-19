@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sys
 import spidev
 import gpiod
@@ -10,13 +11,12 @@ from PyQt5.QtCore import QTimer
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-#GPIO setup: line 26 as open‑drain output, default LOW
+#GPIO setup: line 26 as output, default LOW
 chip      = gpiod.Chip('gpiochip0')
 kill_line = chip.get_line(26)
 kill_line.request(
     consumer="battery_monitor",
     type=gpiod.LINE_REQ_DIR_OUT,
-    flags=gpiod.LINE_REQ_FLAG_OPEN_DRAIN,
     default_vals=[0]
 )
 
@@ -97,7 +97,7 @@ class MainWindow(QMainWindow):
         # safety thresholds
         self.MAX_TEMP    = 60.0;  self.RED_TEMP    = 75.0  # UPDATE LATER IF NEEDED
         self.MAX_CURRENT = 5.0;   self.RED_CURRENT = 7.0  # UPDATE LATER IF NEEDED
-        self.MAX_VOLTAGE = 14.0;  self.RED_VOLTAGE = 14.5  # UPDATE LATER IF NEEDED
+        self.MAX_VOLTAGE = 14.2;  self.RED_VOLTAGE = 14.6  # UPDATE LATER IF NEEDED
 
         # rolling buffers
         size = 5
@@ -151,7 +151,7 @@ class MainWindow(QMainWindow):
         else:
             yellow = False
 
-        # drive kill‑switch: LOW (0 V) when safe, HIGH‑Z -> pulled to 5 V when RED
+        # drive kill‑switch: LOW (0 V) when safe, HIGH (3.3 V) when RED
         kill_line.set_value(int(red))
 
         # update status labels

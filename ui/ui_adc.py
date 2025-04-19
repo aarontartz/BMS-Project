@@ -2,7 +2,7 @@ import sys
 import time
 import spidev
 from gpiozero import Device, DigitalOutputDevice
-from gpiozero.pins.native import NativeFactory
+from gpiozero.pins.gpiod import PiGPIODFactory
 from collections import deque
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
@@ -12,8 +12,8 @@ from PyQt5.QtCore import QTimer
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-# use native pin factory on Ubuntu
-Device.pin_factory = NativeFactory()
+# use libgpiod backend on Ubuntu
+Device.pin_factory = PiGPIODFactory()
 
 #SOCplot
 class BatteryCanvas(FigureCanvas):

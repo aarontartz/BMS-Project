@@ -1,8 +1,6 @@
 import sys
 import time
 import spidev
-from gpiozero import Device, DigitalOutputDevice
-from gpiozero.pins.lgpio import LGPIOFactory
 from collections import deque
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
@@ -11,9 +9,10 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import QTimer
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from gpiozero import Device, DigitalOutputDevice
+from gpiozero.pins.pigpio import PiGPIOFactory
 
-# use lgpio (libgpiod) backend on Ubuntu
-Device.pin_factory = LGPIOFactory()
+Device.pin_factory = PiGPIOFactory()
 
 class BatteryCanvas(FigureCanvas):
     def __init__(self):

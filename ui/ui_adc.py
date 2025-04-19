@@ -157,7 +157,7 @@ class MainWindow(QMainWindow):
                 return 'RED','color:red;'
             if len(buf)==self.buf_size and sum(buf)/len(buf)>max_l:
                 return 'YELLOW','color:orange;'
-            return 'GREEN','color:green;'
+            return 'GREEN','color:green;'
         s_t,c_t=status(temp_c,self.temp_buf,self.MAX_TEMP,self.RED_TEMP)
         s_i,c_i=status(current,self.current_buf,self.MAX_CURRENT,self.RED_CURRENT)
         s_v,c_v=status(batt_v,self.voltage_buf,self.MAX_VOLTAGE,self.RED_VOLTAGE)

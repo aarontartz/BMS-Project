@@ -2,29 +2,35 @@
 #####################################
 How this code works
 #####################################
+
 I mentioned my manager gave me some good advice for this project to make it more real world-applicable.
 
 
 1) filter out noise
 2) use red and yellow limits
 
-1) Noise filtering is done by averaging the last 5 readings of each sensor. This is done using a deque
+1) Noise filtering is done by averaging the last 5 readings of each sensor. 
+This is done using a deque
 
 
-2.a) Yellow Limits are undesired but not damaging to the system. The killswitch is only triggered when the average
-of the deque is above the MAX_<VALUE> 
+2.a) Yellow Limits are undesired but not damaging to the system. The killswitch is only 
+triggered when the averageof the deque is above the MAX_<VALUE> 
 
-2.b) Red Limits are damaging to the system. The killswitch is triggered immediately when the sensor reading. Even
-if the average is below the red limit, if the sensor reading is above the red limit, the killswitch is triggered since we are
-determining the chance of the Red reading being due to noise is less important than the potential to damage the system/environment
+2.b) Red Limits are damaging to the system. The killswitch is triggered 
+immediately when the sensor reading. Even if the average is below the red limit, 
+if the sensor reading is above the red limit, the killswitch is triggered since we are
+determining the chance of the Red reading being due to noise is less important 
+than the potential to damage the system/environment
 
 
 
 --------------------------------------------------
 FREQUENCY
 --------------------------------------------------
-Right now, the frequency at which the sensors are read is set to 1 second. This is done using the time.monotonic() function.
-time.monotic is better than time.sleep because it does not tie up CPU resources. Using time.sleep prevents the CPU from doing anything else.
+Right now, the frequency at which the sensors are read is set to 1 second. 
+This is done using the time.monotonic() function. time.monotic is better 
+than time.sleep because it does not tie up CPU resources. Using time.sleep prevents 
+the CPU from doing anything else.
 """
 
 
@@ -73,7 +79,7 @@ try:
 
             # === RED LIMIT CHECK ===
             if temp_c > RED_TEMP or current > RED_CURRENT or battery_voltage > RED_VOLTAGE:
-                print("🔥 RED LIMIT TRIGGERED! IMMEDIATE SHUTDOWN")
+                print("RED LIMIT TRIGGERED! IMMEDIATE SHUTDOWN")
                 GPIO.output(MOSFET_PIN, GPIO.LOW)
                 break
 
@@ -90,7 +96,7 @@ try:
                 print(f"[AVG] Temp: {avg_temp:.2f} C | Current: {avg_current:.2f} A | Voltage: {avg_voltage:.2f} V")
 
                 if avg_temp > MAX_TEMP or avg_current > MAX_CURRENT or avg_voltage > MAX_VOLTAGE:
-                    print("⚠️ AVERAGE LIMIT EXCEEDED — SHUTTING DOWN")
+                    print("AVERAGE LIMIT EXCEEDED — SHUTTING DOWN")
                     GPIO.output(MOSFET_PIN, GPIO.LOW)
                 else:
                     GPIO.output(MOSFET_PIN, GPIO.HIGH)

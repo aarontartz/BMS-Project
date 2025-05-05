@@ -33,9 +33,9 @@ class BatteryCanvas(FigureCanvas):
         self.line, = self.axes.plot([], [], "-", linewidth=2)
         self.axes.set_xlim(0, self.max_points)
         self.axes.set_ylim(0, 100)
-        self.axes.set_xlabel("Time (s)")
-        self.axes.set_ylabel("SOC (%)")
-        self.axes.set_title("Battery State of Charge")
+        self.axes.set_xlabel("Time (s)", fontsize=24)
+        self.axes.set_ylabel("State of Charge (%)", fontsize=24)
+        self.axes.set_title("Battery State of Charge", fontsize=24, fontweight='bold')
         self.axes.grid(True)
         self.soc_text = self.axes.text(
             0.02, 0.95, "SOC: 0%", transform=self.axes.transAxes
@@ -75,21 +75,18 @@ class MainWindow(QMainWindow):
         form = QFormLayout()
         big = QFont()
         big.setPointSize(18)
+        big_bold  = QFont()
+        big_bold.setPointSize(18)
+        big_bold.setBold(True)
 
         form = QFormLayout()
-        lbl_batt_v  = QLabel("Battery Voltage (V):"); lbl_batt_v.setFont(big)
-        lbl_v_stat  = QLabel("Voltage Status:");      lbl_v_stat.setFont(big)
-        lbl_curr    = QLabel("Load Current (A):");    lbl_curr.setFont(big)
-        lbl_i_stat  = QLabel("Current Status:");      lbl_i_stat.setFont(big)
-        lbl_temp    = QLabel("Temp (°F):");           lbl_temp.setFont(big)
-        lbl_t_stat  = QLabel("Temp Status:");         lbl_t_stat.setFont(big)
+        lbl_batt_v  = QLabel("Battery Voltage (V):"); lbl_batt_v.setFont(big_bold)
+        lbl_curr    = QLabel("Load Current (A):");    lbl_curr.setFont(big_bold)
+        lbl_temp    = QLabel("Temperature (°F):");           lbl_temp.setFont(big_bold)
 
         self.voltage_label  = QLabel("N/A"); self.voltage_label.setFont(big)
-        self.voltage_status = QLabel("N/A"); self.voltage_status.setFont(big)
         self.current_label  = QLabel("N/A"); self.current_label.setFont(big)
-        self.current_status = QLabel("N/A"); self.current_status.setFont(big)
         self.temp_label     = QLabel("N/A"); self.temp_label.setFont(big)
-        self.temp_status    = QLabel("N/A"); self.temp_status.setFont(big)
 
         # put them into the form
         form.addRow(lbl_batt_v, self.voltage_label)
@@ -133,6 +130,14 @@ class MainWindow(QMainWindow):
         r = self.spi.xfer2([1, (8 + ch) << 4, 0])
         return ((r[1] & 3) << 8) + r[2]
 
+    @staticmethod
+    def colour_for(val, buf, max_l, red_l) -> str:
+        if val > red_l:
+            return "red"
+        if len(buf) == buf.maxlen and sum(buf)/len(buf) > max_l:
+            return "orange"
+        return "green"
+
     def update_readings(self):
         # --- read sensors ---
         r_t = self.read_raw(3)
@@ -171,21 +176,13 @@ class MainWindow(QMainWindow):
         # drive kill‑switch: LOW (0 V) when safe, HIGH (3.3 V) when RED
         kill_line.set_value(int(red))
         
-        # update status labels
-        def status(val, buf, max_l, red_l):
-            if val > red_l:
-                return "RED", "color:red;"
-            if len(buf)==buf.maxlen and sum(buf)/len(buf)>max_l:
-                return "YELLOW", "color:orange;"
-            return "GREEN", "color:green;"
+        col_t = self.colour_for(t_c, self.buf_t, self.MAX_TEMP,    self.RED_TEMP)
+        col_i = self.colour_for(i_a, self.buf_i, self.MAX_CURRENT, self.RED_CURRENT)
+        col_v = self.colour_for(b_v, self.buf_v, self.MAX_VOLTAGE, self.RED_VOLTAGE)
 
-        st_t, ct = status(t_c, self.buf_t, self.MAX_TEMP, self.RED_TEMP)
-        st_i, ci = status(i_a, self.buf_i, self.MAX_CURRENT, self.RED_CURRENT)
-        st_v, cv = status(b_v, self.buf_v, self.MAX_VOLTAGE, self.RED_VOLTAGE)
-
-        self.temp_status.setText(st_t);    self.temp_status.setStyleSheet(ct)
-        self.current_status.setText(st_i); self.current_status.setStyleSheet(ci)
-        self.voltage_status.setText(st_v); self.voltage_status.setStyleSheet(cv)
+        self.temp_label.setStyleSheet(f"color:{col_t};")
+        self.current_label.setStyleSheet(f"color:{col_i};")
+        self.voltage_label.setStyleSheet(f"color:{col_v};")
 
     def closeEvent(self, event):
         # ensure kill‑switch goes LOW on exit

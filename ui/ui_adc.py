@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (
     QLabel, QGroupBox, QFormLayout
 )
 from PyQt5.QtCore import QTimer
+from PyQt5.QtGui import QFont
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
@@ -72,15 +73,31 @@ class MainWindow(QMainWindow):
         # ADC readings + status
         box = QGroupBox("Local ADC Readings")
         form = QFormLayout()
-        self.voltage_label  = QLabel("N/A"); self.voltage_status = QLabel("N/A")
-        self.current_label  = QLabel("N/A"); self.current_status = QLabel("N/A")
-        self.temp_label     = QLabel("N/A"); self.temp_status    = QLabel("N/A")
-        form.addRow("Battery Voltage (V):", self.voltage_label)
-        form.addRow("Voltage Status:",        self.voltage_status)
-        form.addRow("Load Current (A):",      self.current_label)
-        form.addRow("Current Status:",        self.current_status)
-        form.addRow("Temp (°F):",             self.temp_label)
-        form.addRow("Temp Status:",           self.temp_status)
+        big = QFont()
+        big.setPointSize(18)
+
+        form = QFormLayout()
+        lbl_batt_v  = QLabel("Battery Voltage (V):"); lbl_batt_v.setFont(big)
+        lbl_v_stat  = QLabel("Voltage Status:");      lbl_v_stat.setFont(big)
+        lbl_curr    = QLabel("Load Current (A):");    lbl_curr.setFont(big)
+        lbl_i_stat  = QLabel("Current Status:");      lbl_i_stat.setFont(big)
+        lbl_temp    = QLabel("Temp (°F):");           lbl_temp.setFont(big)
+        lbl_t_stat  = QLabel("Temp Status:");         lbl_t_stat.setFont(big)
+
+        self.voltage_label  = QLabel("N/A"); self.voltage_label.setFont(big)
+        self.voltage_status = QLabel("N/A"); self.voltage_status.setFont(big)
+        self.current_label  = QLabel("N/A"); self.current_label.setFont(big)
+        self.current_status = QLabel("N/A"); self.current_status.setFont(big)
+        self.temp_label     = QLabel("N/A"); self.temp_label.setFont(big)
+        self.temp_status    = QLabel("N/A"); self.temp_status.setFont(big)
+
+        # put them into the form
+        form.addRow(lbl_batt_v, self.voltage_label)
+        form.addRow(lbl_v_stat, self.voltage_status)
+        form.addRow(lbl_curr,   self.current_label)
+        form.addRow(lbl_i_stat, self.current_status)
+        form.addRow(lbl_temp,   self.temp_label)
+        form.addRow(lbl_t_stat, self.temp_status)
         box.setLayout(form)
         layout.addWidget(box)
 

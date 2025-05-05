@@ -139,17 +139,17 @@ class MainWindow(QMainWindow):
         v_t = r_t / 1024.0 * 5.0
         t_c = 100*(v_t - 0.75) + 25
         t_f = t_c * 9/5 + 32
-        self.temp_label.setText(f"{t_f:.1f}")
+        self.temp_label.setText(f"{t_f:.1f} °F")
 
         r_i = self.read_raw(4)
         v_i = r_i / 1024.0 * 5.0
         i_a = (v_i - 2.5)/0.1375 - 1
-        self.current_label.setText(f"{i_a:.2f}")
+        self.current_label.setText(f"{i_a:.2f} A")
 
         r_v = self.read_raw(2)
         v_s = r_v / 1024.0 * 5.0
         b_v = v_s * (self.volt_max / 5.0)
-        self.voltage_label.setText(f"{b_v:.2f}")
+        self.voltage_label.setText(f"{b_v:.2f} V")
 
         # SOC
         soc = (b_v - self.volt_min)/(self.volt_max - self.volt_min)*100
@@ -170,7 +170,7 @@ class MainWindow(QMainWindow):
 
         # drive kill‑switch: LOW (0 V) when safe, HIGH (3.3 V) when RED
         kill_line.set_value(int(red))
-
+        
         # update status labels
         def status(val, buf, max_l, red_l):
             if val > red_l:

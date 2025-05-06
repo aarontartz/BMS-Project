@@ -9,6 +9,7 @@ import time
 import os
 import datetime
 import threading
+import csv
 from collections import deque
 
 # Print debug information
@@ -591,6 +592,30 @@ class MainWindow(QMainWindow):
         self.log_viewer = LogViewer()
         self.tabs.addTab(self.log_viewer, "System Log")
         
+        # Manual Killswitch Control
+        self.manual_killswitch_active = False
+        self.killswitch_box = QGroupBox("Emergency Killswitch")
+        killswitch_layout = QVBoxLayout()
+        
+        # Status indicator
+        self.killswitch_status = QLabel("Killswitch Status: NORMAL")
+        self.killswitch_status.setFont(QFont("Arial", 14, QFont.Bold))
+        self.killswitch_status.setStyleSheet("color: green;")
+        killswitch_layout.addWidget(self.killswitch_status)
+        
+        # Control button
+        self.killswitch_button = QPushButton("EMERGENCY KILLSWITCH")
+        self.killswitch_button.setMinimumHeight(50)
+        self.killswitch_button.setFont(QFont("Arial", 14, QFont.Bold))
+        self.killswitch_button.setStyleSheet("background-color: red; color: white; font-weight: bold; padding: 10px;")
+        self.killswitch_button.clicked.connect(self.toggle_killswitch)
+        killswitch_layout.addWidget(self.killswitch_button)
+        
+        killswitch_layout.addWidget(QLabel("Press to manually activate/deactivate the killswitch"))
+        
+        self.killswitch_box.setLayout(killswitch_layout)
+        self.main_layout.addWidget(self.killswitch_box)
+        
         # SOC plot in main tab
         self.canvas = BatteryCanvas()
         self.main_layout.addWidget(self.canvas)
@@ -727,6 +752,20 @@ class MainWindow(QMainWindow):
         
         # Set last model update time
         self.last_model_update = time.time()
+        
+        # CSV data logging setup
+        self.csv_log_dir = os.path.join(os.path.expanduser("~"), "battery_data_logs")
+        if not os.path.exists(self.csv_log_dir):
+            try:
+                os.makedirs(self.csv_log_dir)
+                print(f"Created CSV log directory: {self.csv_log_dir}")
+            except Exception as e:
+                print(f"Error creating CSV log directory: {e}")
+                self.csv_log_dir = "."  # Fallback to current directory
+        
+        # Variables to track state
+        self.last_csv_log_time = time.time()
+        self.csv_log_interval = 300  # 5 minutes in seconds
         
         # Start background thread for model updates
         self.start_model_updater()
@@ -877,6 +916,31 @@ class MainWindow(QMainWindow):
             print(f"Error in update_readings: {e}")
             self.log_event(f"Error updating readings: {e}")
 
+    def toggle_killswitch(self):
+        """Toggle the killswitch on/off"""
+        try:
+            # Toggle state
+            self.manual_killswitch_active = not self.manual_killswitch_active
+            
+            # Set killswitch according to new state
+            set_kill_switch(self.manual_killswitch_active)
+            
+            # Update UI
+            if self.manual_killswitch_active:
+                self.killswitch_status.setText("Killswitch Status: MANUALLY ENGAGED")
+                self.killswitch_status.setStyleSheet("color: red; font-weight: bold;")
+                self.killswitch_button.setText("RELEASE KILLSWITCH")
+                self.log_event("MANUAL KILLSWITCH ENGAGED by user")
+            else:
+                self.killswitch_status.setText("Killswitch Status: NORMAL")
+                self.killswitch_status.setStyleSheet("color: green;")
+                self.killswitch_button.setText("EMERGENCY KILLSWITCH")
+                self.log_event("MANUAL KILLSWITCH RELEASED by user")
+                
+        except Exception as e:
+            print(f"Error toggling killswitch: {e}")
+            self.log_event(f"Error toggling killswitch: {e}")
+    
     def start_model_updater(self):
         """Start background thread for model updates"""
         try:
@@ -942,6 +1006,22 @@ class MainWindow(QMainWindow):
             # Reset kill switch
             set_kill_switch(False)
             
+            # Write final CSV log entry before exit
+            try:
+                self.write_csv_log(
+                    timestamp=datetime.datetime.now(),
+                    voltage=float(self.voltage_label.text().split()[0]),
+                    current=float(self.current_label.text().split()[0]),
+                    temperature=float(self.temp_label.text().split()[0]),
+                    soc=float(self.canvas.soc_history[-1]),
+                    soh=float(self.soh_label.text().replace('%', '')),
+                    anomaly_score=float(self.anomaly_label.text()),
+                    is_anomaly=(self.ai_status_label.text() == "ANOMALY DETECTED"),
+                    killswitch_status=False  # We're turning it off
+                )
+            except Exception as e:
+                print(f"Error writing final CSV log: {e}")
+            
             # Save AI model data
             self.ai_system.save_models()
             self.log_event("System shutdown - models saved")
@@ -949,6 +1029,7 @@ class MainWindow(QMainWindow):
             event.accept()
         except Exception as e:
             print(f"Error during shutdown: {e}")
+
 
 # Main execution block with error handling
 if __name__ == "__main__":

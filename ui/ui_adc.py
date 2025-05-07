@@ -35,7 +35,8 @@ class BatteryCanvas(FigureCanvas):
         self.axes.set_ylim(0, 100)
         self.axes.set_xlabel("Time (s)", fontsize=24)
         self.axes.set_ylabel("State of Charge (%)", fontsize=24)
-        self.axes.set_title("Battery State of Charge", fontsize=24, fontweight='bold')
+        self.axes.set_title("Battery State of Charge", fontsize=30, fontweight='bold')
+        self.axes.tick_params(axis="both", which="major", labelsize=18)
         self.axes.grid(True)
         self.soc_text = self.axes.text(
             0.02, 0.95, "SOC: 0%", transform=self.axes.transAxes
@@ -74,15 +75,15 @@ class MainWindow(QMainWindow):
         box = QGroupBox("Local ADC Readings")
         form = QFormLayout()
         big = QFont()
-        big.setPointSize(18)
+        big.setPointSize(30)
         big_bold  = QFont()
-        big_bold.setPointSize(18)
+        big_bold.setPointSize(30)
         big_bold.setBold(True)
 
         form = QFormLayout()
-        lbl_batt_v  = QLabel("Battery Voltage (V):"); lbl_batt_v.setFont(big_bold)
-        lbl_curr    = QLabel("Load Current (A):");    lbl_curr.setFont(big_bold)
-        lbl_temp    = QLabel("Temperature (°F):");           lbl_temp.setFont(big_bold)
+        lbl_batt_v  = QLabel("Battery Voltage:"); lbl_batt_v.setFont(big_bold)
+        lbl_curr    = QLabel("Load Current:");    lbl_curr.setFont(big_bold)
+        lbl_temp    = QLabel("Temperature:");           lbl_temp.setFont(big_bold)
 
         self.voltage_label  = QLabel("N/A"); self.voltage_label.setFont(big)
         self.current_label  = QLabel("N/A"); self.current_label.setFont(big)
@@ -90,11 +91,11 @@ class MainWindow(QMainWindow):
 
         # put them into the form
         form.addRow(lbl_batt_v, self.voltage_label)
-        form.addRow(lbl_v_stat, self.voltage_status)
+#        form.addRow(lbl_v_stat, self.voltage_status)
         form.addRow(lbl_curr,   self.current_label)
-        form.addRow(lbl_i_stat, self.current_status)
+#        form.addRow(lbl_i_stat, self.current_status)
         form.addRow(lbl_temp,   self.temp_label)
-        form.addRow(lbl_t_stat, self.temp_status)
+#        form.addRow(lbl_t_stat, self.temp_status)
         box.setLayout(form)
         layout.addWidget(box)
 
@@ -140,13 +141,13 @@ class MainWindow(QMainWindow):
 
     def update_readings(self):
         # --- read sensors ---
-        r_t = self.read_raw(3)
+        r_t = self.read_raw(0)
         v_t = r_t / 1024.0 * 5.0
         t_c = 100*(v_t - 0.75) + 25
         t_f = t_c * 9/5 + 32
         self.temp_label.setText(f"{t_f:.1f} °F")
 
-        r_i = self.read_raw(4)
+        r_i = self.read_raw(1)
         v_i = r_i / 1024.0 * 5.0
         i_a = (v_i - 2.5)/0.1375 - 1
         self.current_label.setText(f"{i_a:.2f} A")

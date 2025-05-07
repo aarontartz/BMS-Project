@@ -593,28 +593,28 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.log_viewer, "System Log")
         
         # Manual Killswitch Control
-        self.manual_killswitch_active = False
+        """self.manual_killswitch_active = False
         self.killswitch_box = QGroupBox("Emergency Killswitch")
-        killswitch_layout = QVBoxLayout()
+        killswitch_layout = QVBoxLayout()"""
         
         # Status indicator
-        self.killswitch_status = QLabel("Killswitch Status: NORMAL")
+        """self.killswitch_status = QLabel("Killswitch Status: NORMAL")
         self.killswitch_status.setFont(QFont("Arial", 14, QFont.Bold))
         self.killswitch_status.setStyleSheet("color: green;")
-        killswitch_layout.addWidget(self.killswitch_status)
+        killswitch_layout.addWidget(self.killswitch_status)"""
         
         # Control button
-        self.killswitch_button = QPushButton("EMERGENCY KILLSWITCH")
+        """self.killswitch_button = QPushButton("EMERGENCY KILLSWITCH")
         self.killswitch_button.setMinimumHeight(50)
         self.killswitch_button.setFont(QFont("Arial", 14, QFont.Bold))
         self.killswitch_button.setStyleSheet("background-color: red; color: white; font-weight: bold; padding: 10px;")
         self.killswitch_button.clicked.connect(self.toggle_killswitch)
-        killswitch_layout.addWidget(self.killswitch_button)
+        killswitch_layout.addWidget(self.killswitch_button)"""
         
-        killswitch_layout.addWidget(QLabel("Press to manually activate/deactivate the killswitch"))
-        
-        self.killswitch_box.setLayout(killswitch_layout)
-        self.main_layout.addWidget(self.killswitch_box)
+"""        killswitch_layout.addWidget(QLabel("Press to manually activate/deactivate the killswitch"))
+"""        
+        """self.killswitch_box.setLayout(killswitch_layout)
+        self.main_layout.addWidget(self.killswitch_box)"""
         
         # SOC plot in main tab
         self.canvas = BatteryCanvas()
@@ -916,7 +916,7 @@ class MainWindow(QMainWindow):
             print(f"Error in update_readings: {e}")
             self.log_event(f"Error updating readings: {e}")
 
-    def toggle_killswitch(self):
+    """def toggle_killswitch(self):
         """Toggle the killswitch on/off"""
         try:
             # Toggle state
@@ -939,7 +939,7 @@ class MainWindow(QMainWindow):
                 
         except Exception as e:
             print(f"Error toggling killswitch: {e}")
-            self.log_event(f"Error toggling killswitch: {e}")
+            self.log_event(f"Error toggling killswitch: {e}")"""
     
     def start_model_updater(self):
         """Start background thread for model updates"""

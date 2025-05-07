@@ -5,7 +5,7 @@ import gpiod
 from collections import deque
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
-    QLabel, QGroupBox, QFormLayout
+    QLabel, QGroupBox, QFormLayout, QPushButton
 )
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QFont
@@ -71,6 +71,21 @@ class MainWindow(QMainWindow):
         self.canvas = BatteryCanvas()
         layout.addWidget(self.canvas)
 
+        # --- manual discharge button & status label --------------------------
+        self.discharge_btn = QPushButton("Decharge")
+        self.discharge_btn.setCheckable(True)
+        self.discharge_btn.toggled.connect(self.toggle_discharge)
+        layout.addWidget(self.discharge_btn)
+
+        big_bold_status = QFont()
+        big_bold_status.setPointSize(30)
+        big_bold_status.setBold(True)
+        self.kill_status = QLabel("Charging")
+        self.kill_status.setFont(big_bold_status)
+        self.kill_status.setStyleSheet("color:green;")
+        layout.addWidget(self.kill_status)
+        # --------------------------------------------------------------------
+
         # ADC readings + status
         box = QGroupBox("Local ADC Readings")
         form = QFormLayout()
@@ -120,6 +135,9 @@ class MainWindow(QMainWindow):
         self.buf_i = deque(maxlen=size)
         self.buf_v = deque(maxlen=size)
 
+        # manual override flag
+        self.manual_discharge = False
+
         # start periodic updates
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_readings)
@@ -138,6 +156,9 @@ class MainWindow(QMainWindow):
         if len(buf) == buf.maxlen and sum(buf)/len(buf) > max_l:
             return "orange"
         return "green"
+
+    def toggle_discharge(self, checked):
+        self.manual_discharge = checked
 
     def update_readings(self):
         # --- read sensors ---
@@ -174,9 +195,10 @@ class MainWindow(QMainWindow):
         else:
             yellow = False
 
-        # drive kill‑switch: LOW (0 V) when safe, HIGH (3.3 V) when RED
-        kill_line.set_value(int(red))
-        
+        # drive kill‑switch: LOW (0 V) when safe, HIGH (3.3 V) when RED or manual
+        kill_state = int(red or self.manual_discharge)
+        kill_line.set_value(kill_state)
+
         col_t = self.colour_for(t_c, self.buf_t, self.MAX_TEMP,    self.RED_TEMP)
         col_i = self.colour_for(i_a, self.buf_i, self.MAX_CURRENT, self.RED_CURRENT)
         col_v = self.colour_for(b_v, self.buf_v, self.MAX_VOLTAGE, self.RED_VOLTAGE)
@@ -184,6 +206,14 @@ class MainWindow(QMainWindow):
         self.temp_label.setStyleSheet(f"color:{col_t};")
         self.current_label.setStyleSheet(f"color:{col_i};")
         self.voltage_label.setStyleSheet(f"color:{col_v};")
+
+        # update status label
+        if kill_state:
+            self.kill_status.setText("Discharging")
+            self.kill_status.setStyleSheet("color:red;")
+        else:
+            self.kill_status.setText("Charging")
+            self.kill_status.setStyleSheet("color:green;")
 
     def closeEvent(self, event):
         # ensure kill‑switch goes LOW on exit

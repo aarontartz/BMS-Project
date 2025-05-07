@@ -5,7 +5,7 @@ import gpiod
 from collections import deque
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
-    QLabel, QGroupBox, QFormLayout, QPushButton, QHBoxLayout  # QHBoxLayout left in (no harm)
+    QLabel, QGroupBox, QFormLayout, QPushButton, QHBoxLayout
 )
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QFont
@@ -77,23 +77,23 @@ class MainWindow(QMainWindow):
         self.discharge_btn.toggled.connect(self.toggle_discharge)
         layout.addWidget(self.discharge_btn)
 
-        # status label (will sit below sensor readings)
-        big_bold_status = QFont()
-        big_bold_status.setPointSize(30)
-        big_bold_status.setBold(True)
+        # fonts
+        big         = QFont(); big.setPointSize(30)
+        big_bold    = QFont(); big_bold.setPointSize(30); big_bold.setBold(True)
+
+        # status label (now inside sensor box)
         self.kill_status = QLabel("Charging")
-        self.kill_status.setFont(big_bold_status)
+        self.kill_status.setFont(big)
         self.kill_status.setStyleSheet("color:green;")
 
         # ADC readings
-        box = QGroupBox("Local ADC Readings")
+        box  = QGroupBox("Local ADC Readings")
         form = QFormLayout()
-        big = QFont(); big.setPointSize(30)
-        big_bold = QFont(); big_bold.setPointSize(30); big_bold.setBold(True)
 
         lbl_batt_v = QLabel("Battery Voltage:"); lbl_batt_v.setFont(big_bold)
         lbl_curr   = QLabel("Load Current:");    lbl_curr.setFont(big_bold)
         lbl_temp   = QLabel("Temperature:");     lbl_temp.setFont(big_bold)
+        lbl_stat   = QLabel("Relay Status:");    lbl_stat.setFont(big_bold)   # new row label
 
         self.voltage_label = QLabel("N/A"); self.voltage_label.setFont(big)
         self.current_label = QLabel("N/A"); self.current_label.setFont(big)
@@ -102,11 +102,10 @@ class MainWindow(QMainWindow):
         form.addRow(lbl_batt_v, self.voltage_label)
         form.addRow(lbl_curr,   self.current_label)
         form.addRow(lbl_temp,   self.temp_label)
+        form.addRow(lbl_stat,   self.kill_status)        # status row
         box.setLayout(form)
 
-        # sensor box followed by status label (status at bottom)
-        layout.addWidget(box)
-        layout.addWidget(self.kill_status)
+        layout.addWidget(box)                            # add sensor box (now includes status)
 
         # SPI/MCP3008 setup
         self.spi = spidev.SpiDev()
@@ -185,11 +184,11 @@ class MainWindow(QMainWindow):
         self.voltage_label.setStyleSheet(f"color:{col_v};")
 
         # drive GPIO 26 (ACTIVE‑LOW)
-        active = red or self.manual_discharge          # TRUE means want to discharge
-        kill_state = int(not active)                   # LOW when active, HIGH when safe
+        active = red or self.manual_discharge
+        kill_state = int(not active)           # LOW when active, HIGH when safe
         kill_line.set_value(kill_state)
 
-        # update status label
+        # update status label inside sensor box
         if active:
             self.kill_status.setText("Discharging")
             self.kill_status.setStyleSheet("color:red;")

@@ -5,7 +5,7 @@ import gpiod
 from collections import deque
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
-    QLabel, QGroupBox, QFormLayout, QPushButton
+    QLabel, QGroupBox, QFormLayout, QPushButton, QHBoxLayout   # added QHBoxLayout
 )
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QFont
@@ -71,20 +71,19 @@ class MainWindow(QMainWindow):
         self.canvas = BatteryCanvas()
         layout.addWidget(self.canvas)
 
-        # --- manual discharge button & status label --------------------------
+        # manual discharge button
         self.discharge_btn = QPushButton("Decharge")
         self.discharge_btn.setCheckable(True)
         self.discharge_btn.toggled.connect(self.toggle_discharge)
         layout.addWidget(self.discharge_btn)
 
+        # status label (now placed beside sensor box)
         big_bold_status = QFont()
         big_bold_status.setPointSize(30)
         big_bold_status.setBold(True)
         self.kill_status = QLabel("Charging")
         self.kill_status.setFont(big_bold_status)
         self.kill_status.setStyleSheet("color:green;")
-        layout.addWidget(self.kill_status)
-        # --------------------------------------------------------------------
 
         # ADC readings + status
         box = QGroupBox("Local ADC Readings")
@@ -98,7 +97,7 @@ class MainWindow(QMainWindow):
         form = QFormLayout()
         lbl_batt_v  = QLabel("Battery Voltage:"); lbl_batt_v.setFont(big_bold)
         lbl_curr    = QLabel("Load Current:");    lbl_curr.setFont(big_bold)
-        lbl_temp    = QLabel("Temperature:");           lbl_temp.setFont(big_bold)
+        lbl_temp    = QLabel("Temperature:");     lbl_temp.setFont(big_bold)
 
         self.voltage_label  = QLabel("N/A"); self.voltage_label.setFont(big)
         self.current_label  = QLabel("N/A"); self.current_label.setFont(big)
@@ -112,7 +111,12 @@ class MainWindow(QMainWindow):
         form.addRow(lbl_temp,   self.temp_label)
 #        form.addRow(lbl_t_stat, self.temp_status)
         box.setLayout(form)
-        layout.addWidget(box)
+
+        # side‑by‑side layout for readings + status
+        row = QHBoxLayout()
+        row.addWidget(box)
+        row.addWidget(self.kill_status)
+        layout.addLayout(row)
 
         # SPI/MCP3008 setup
         self.spi = spidev.SpiDev()
@@ -159,6 +163,8 @@ class MainWindow(QMainWindow):
 
     def toggle_discharge(self, checked):
         self.manual_discharge = checked
+        # change button text so user knows it toggles back
+        self.discharge_btn.setText("Charge" if checked else "Decharge")
 
     def update_readings(self):
         # --- read sensors ---

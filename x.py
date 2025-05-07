@@ -103,7 +103,7 @@ if using_gpiod:
         kill_line.request(
             consumer="battery_monitor",
             type=gpiod.LINE_REQ_DIR_OUT,
-            default_vals=[0]
+            default_vals=[1]
         )
         
         def set_kill_switch(value):
@@ -695,8 +695,8 @@ class MainWindow(QMainWindow):
         self.volt_max = 14.6
 
         # safety thresholds
-        self.MAX_TEMP    = 70.0;  self.RED_TEMP    = 80.0
-        self.MAX_CURRENT = 4.0;   self.RED_CURRENT = 4.5
+        self.MAX_TEMP    = 50.0;  self.RED_TEMP    = 80.0
+        self.MAX_CURRENT = 2.5;   self.RED_CURRENT = 4.5
         self.MAX_VOLTAGE = 14.0;  self.RED_VOLTAGE = 14.5
 
         # rolling buffers
@@ -882,7 +882,7 @@ class MainWindow(QMainWindow):
             self.data_points_label.setText(str(len(self.ai_system.readings)))
             
             # Set kill switch based on combined safety decision
-            set_kill_switch(combined_red)
+            set_kill_switch(not combined_red)
             
             # Log severe safety events
             if combined_red and not self.last_was_red:

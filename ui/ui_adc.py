@@ -125,9 +125,9 @@ class MainWindow(QMainWindow):
         self.volt_max = 14.6  # UPDATE LATER IF NEEDED
 
         # safety thresholds
-        self.MAX_TEMP    = 70.0;  self.RED_TEMP    = 80.0  # UPDATE LATER IF NEEDED
-        self.MAX_CURRENT = 4.0;   self.RED_CURRENT = 4.5  # UPDATE LATER IF NEEDED
-        self.MAX_VOLTAGE = 14.0;  self.RED_VOLTAGE = 14.5  # UPDATE LATER IF NEEDED
+        self.MAX_TEMP    = 50.0;  self.RED_TEMP    = 60.0  # UPDATE LATER IF NEEDED (celsius)
+        self.MAX_CURRENT = 2.5;   self.RED_CURRENT = 3.0  # UPDATE LATER IF NEEDED
+        self.MAX_VOLTAGE = 14.0;  self.RED_VOLTAGE = 15.0  # UPDATE LATER IF NEEDED
 
         # rolling buffers
         size = 5

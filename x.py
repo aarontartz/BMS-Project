@@ -2,6 +2,7 @@
 """
 Smart Battery Monitor with AI Safety System
 For Raspberry Pi 5 with MCP3008 ADC
+Modified to match the sensor reading approach of the simpler script
 """
 
 import sys
@@ -93,7 +94,7 @@ except ImportError:
 
 print("All imports successful!")
 
-# GPIO setup with fallback
+# GPIO setup like in the second script
 KILL_PIN = 26
 if using_gpiod:
     try:
@@ -118,10 +119,10 @@ else:
     try:
         print(f"Setting up RPi.GPIO on pin {KILL_PIN}...")
         GPIO.setup(KILL_PIN, GPIO.OUT)
-        GPIO.output(KILL_PIN, GPIO.LOW)
+        GPIO.output(KILL_PIN, GPIO.HIGH)  # Changed to HIGH (safe) by default like second script
         
         def set_kill_switch(value):
-            GPIO.output(KILL_PIN, GPIO.HIGH if value else GPIO.LOW)
+            GPIO.output(KILL_PIN, GPIO.HIGH if value else GPIO.LOW)  # Match second script logic
     except Exception as e:
         print(f"ERROR: RPi.GPIO setup failed: {e}")
         print("Continuing with dummy GPIO...")
@@ -161,13 +162,9 @@ class BatteryCanvas(FigureCanvas):
 
     def update_soc(self, soc, dt):
         try:
-            # Apply 2-point moving average
-            prev = self.soc_history[-1]
-            avg_soc = (prev + soc) / 2
-
             t_new = self.time_history[-1] + dt
             self.time_history.append(t_new)
-            self.soc_history.append(avg_soc)
+            self.soc_history.append(soc)
 
             if len(self.soc_history) > self.max_points:
                 self.soc_history = self.soc_history[-self.max_points:]
@@ -175,7 +172,7 @@ class BatteryCanvas(FigureCanvas):
 
             self.line.set_data(self.time_history, self.soc_history)
             self.axes.set_xlim(self.time_history[0], self.time_history[-1] * 1.05)
-            self.soc_text.set_text(f"SOC: {avg_soc:.1f}%")
+            self.soc_text.set_text(f"SOC: {soc:.1f}%")
             self.draw()
         except Exception as e:
             print(f"Error in update_soc: {e}")
@@ -275,7 +272,7 @@ class BatteryManagementAI:
         # Setup signals
         self.signals = AISignals()
         
-        # ADC pin configuration
+        # ADC pin configuration - Updated to match second script
         self.voltage_pin = voltage_pin
         self.current_pin = current_pin
         self.temp_pin = temp_pin
@@ -592,10 +589,310 @@ class MainWindow(QMainWindow):
         self.log_viewer = LogViewer()
         self.tabs.addTab(self.log_viewer, "System Log")
         
-        # Manual Killswitch Control
+        # Manual override flag
+        self.manual_discharge = False
         
-        # Status indicator
+        # Initialize AI system
+        print("Initializing AI system...")
+        self.ai_system = BatteryManagementAI(
+            voltage_pin=2,  # Match second script: Channel 2 for voltage
+            current_pin=1,  # Match second script: Channel 1 for current
+            temp_pin=0,     # Match second script: Channel 0 for temperature
+            voltage_red_limit=self.RED_VOLTAGE,
+            voltage_yellow_limit=self.MAX_VOLTAGE,
+            current_red_limit=self.RED_CURRENT,
+            current_yellow_limit=self.MAX_CURRENT,
+            temp_red_limit=self.RED_TEMP,
+            temp_yellow_limit=self.MAX_TEMP,
+            sample_rate=1.0,  # Match second script: 1 second sampling
+            history_size=5000
+        )
         
+        # Connect AI signals
+        self.ai_system.signals.soh_updated.connect(self.update_soh)
+        self.ai_system.signals.anomaly_detected.connect(self.update_anomaly)
+        self.ai_system.signals.model_updated.connect(self.model_updated)
+        self.ai_system.signals.log_event.connect(self.log_event)
+        
+        # Set last model update time
+        self.last_model_update = time.time()
+        
+        # CSV data logging setup
+        self.csv_log_dir = os.path.join(os.path.expanduser("~"), "battery_data_logs")
+        if not os.path.exists(self.csv_log_dir):
+            try:
+                os.makedirs(self.csv_log_dir)
+                print(f"Created CSV log directory: {self.csv_log_dir}")
+            except Exception as e:
+                print(f"Error creating CSV log directory: {e}")
+                self.csv_log_dir = "."  # Fallback to current directory
+        
+        # Variables to track state
+        self.last_csv_log_time = time.time()
+        self.csv_log_interval = 300  # 5 minutes in seconds
+        
+        # Start background thread for model updates
+        self.start_model_updater()
+        
+        # Log system startup
+        self.log_event("Smart Battery Monitor System started")
+        
+        # start periodic updates (every 1 second - same as second script)
+        self.sample_dt = 1.0
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_readings)
+        self.timer.start(int(self.sample_dt * 1000))
+        
+        print("Main window initialization complete.")
+
+    def toggle_discharge(self, checked):
+        """Handle manual discharge button toggling"""
+        self.manual_discharge = checked
+        self.log_event(f"Manual discharge {'enabled' if checked else 'disabled'}")
+
+    def read_raw(self, ch):
+        """Read raw ADC value with dummy mode fallback - same as second script"""
+        if not (0 <= ch <= 7):
+            return 0
+            
+        if self.spi is None:
+            # Dummy mode - simulate reasonable values with some noise
+            import random
+            if ch == 2:  # Voltage channel
+                return int((12.5 + random.uniform(-0.3, 0.3)) * (1024.0 / self.volt_max))
+            elif ch == 0:  # Temperature channel (updated to match second script)
+                temp_c = 35 + random.uniform(-5, 5)  # ~35°C with noise
+                v_out = (temp_c - 25) / 100 + 0.75
+                return int(v_out * 1024.0 / 5.0)
+            elif ch == 1:  # Current channel (updated to match second script)
+                current = 2.0 + random.uniform(-0.5, 0.5)  # ~2A with noise
+                v_out = 2.5 + current * 0.1375
+                return int(v_out * 1024.0 / 5.0)
+            else:
+                return random.randint(0, 1023)
+        
+        try:
+            r = self.spi.xfer2([1, (8 + ch) << 4, 0])
+            return ((r[1] & 3) << 8) + r[2]
+        except Exception as e:
+            print(f"Error reading ADC: {e}")
+            # Fall back to dummy values if SPI fails
+            return self.read_raw(ch)
+
+    @staticmethod
+    def colour_for(val, buf, max_l, red_l) -> str:
+        """Determine color based on value and thresholds - same as second script"""
+        if val > red_l:
+            return "red"
+        if len(buf) == buf.maxlen and sum(buf)/len(buf) > max_l:
+            return "orange"
+        return "green"
+
+    def update_readings(self):
+        """Update sensor readings and process safety logic - modified to match second script"""
+        try:
+            # --- read sensors the same way as second script ---
+            
+            # Temperature - Using channel 0 like second script
+            r_t = self.read_raw(0)
+            v_t = r_t / 1024.0 * 5.0
+            t_c = 100*(v_t - 0.75) + 25
+            t_f = t_c * 9/5 + 32
+            self.temp_label.setText(f"{t_f:.1f} °F")
+
+            # Current - Using channel 1 like second script
+            r_i = self.read_raw(1)
+            v_i = r_i / 1024.0 * 5.0
+            i_a = (v_i - 2.5)/0.1375 - 1
+            self.current_label.setText(f"{i_a:.2f} A")
+
+            # Voltage - Using channel 2 like second script
+            r_v = self.read_raw(2)
+            v_s = r_v / 1024.0 * 5.0
+            b_v = v_s * (self.volt_max / 5.0)
+            self.voltage_label.setText(f"{b_v:.2f} V")
+
+            # SOC calculation - same as second script
+            soc = (b_v - self.volt_min)/(self.volt_max - self.volt_min)*100
+            soc = max(0, min(100, soc))
+            self.canvas.update_soc(soc, self.sample_dt)
+
+            # safety logic - basic thresholds - same approach as second script
+            red = (t_c > self.RED_TEMP) or (i_a > self.RED_CURRENT) or (b_v > self.RED_VOLTAGE)
+            self.buf_t.append(t_c)
+            self.buf_i.append(i_a)
+            self.buf_v.append(b_v)
+
+            if len(self.buf_t) == self.buf_t.maxlen:
+                at = sum(self.buf_t)/len(self.buf_t)
+                ai = sum(self.buf_i)/len(self.buf_i)
+                av = sum(self.buf_v)/len(self.buf_v)
+                yellow = (at > self.MAX_TEMP) or (ai > self.MAX_CURRENT) or (av > self.MAX_VOLTAGE)
+            else:
+                yellow = False
+
+            # AI processing
+            anomaly_score, is_anomaly, soh = self.ai_system.add_reading(b_v, i_a, t_c)
+            
+            # Update SOH display if we have a new one
+            self.soh_label.setText(f"{soh:.1f}%")
+            
+            # Update anomaly score display
+            self.anomaly_label.setText(f"{anomaly_score:.3f}")
+            if is_anomaly:
+                self.anomaly_label.setStyleSheet("color: red; font-weight: bold;")
+                self.ai_status_label.setText("ANOMALY DETECTED")
+                self.ai_status_label.setStyleSheet("color: red; font-weight: bold;")
+                self.log_event(f"ANOMALY DETECTED! Score: {anomaly_score:.3f}")
+            elif anomaly_score > 0.5:
+                self.anomaly_label.setStyleSheet("color: orange;")
+                self.ai_status_label.setText("UNUSUAL PATTERN")
+                self.ai_status_label.setStyleSheet("color: orange;")
+            else:
+                self.anomaly_label.setStyleSheet("color: green;")
+                self.ai_status_label.setText("NORMAL")
+                self.ai_status_label.setStyleSheet("color: green;")
+            
+            # Combined safety decision (traditional + AI + manual override)
+            active = red or is_anomaly or self.manual_discharge
+            
+            # Update safety status displays
+            col_t = self.colour_for(t_c, self.buf_t, self.MAX_TEMP, self.RED_TEMP)
+            col_i = self.colour_for(i_a, self.buf_i, self.MAX_CURRENT, self.RED_CURRENT)
+            col_v = self.colour_for(b_v, self.buf_v, self.MAX_VOLTAGE, self.RED_VOLTAGE)
+
+            self.temp_label.setStyleSheet(f"color:{col_t};")
+            self.current_label.setStyleSheet(f"color:{col_i};")
+            self.voltage_label.setStyleSheet(f"color:{col_v};")
+            
+            # Update kill switch status label like in second script
+            if active:
+                self.kill_status.setText("Discharging")
+                self.kill_status.setStyleSheet("color:red;")
+            else:
+                self.kill_status.setText("Charging")
+                self.kill_status.setStyleSheet("color:green;")
+            
+            # Update AI charts
+            self.anomaly_canvas.update_score(anomaly_score, self.sample_dt)
+            self.soh_canvas.update_soh(soh, self.sample_dt)
+            
+            # Update data points count
+            self.data_points_label.setText(str(len(self.ai_system.readings)))
+            
+            # Set kill switch based on combined decision (ACTIVE_LOW logic like in second script)
+            kill_state = int(not active)  # LOW when active, HIGH when safe
+            set_kill_switch(kill_state)
+            
+            # Log severe safety events
+            if active and not self.last_was_red:
+                self.log_event(f"EMERGENCY SHUTDOWN - V:{b_v:.2f}V, I:{i_a:.2f}A, T:{t_c:.1f}°C, Anomaly:{anomaly_score:.3f}")
+            elif yellow and not self.last_was_yellow:
+                self.log_event(f"WARNING CONDITION - V:{b_v:.2f}V, I:{i_a:.2f}A, T:{t_c:.1f}°C, Anomaly:{anomaly_score:.3f}")
+                
+            self.last_was_red = active
+            self.last_was_yellow = yellow
+            
+        except Exception as e:
+            print(f"Error in update_readings: {e}")
+            self.log_event(f"Error updating readings: {e}")
+    
+    def start_model_updater(self):
+        """Start background thread for model updates"""
+        try:
+            self.updater_thread = threading.Thread(target=self.model_updater_thread)
+            self.updater_thread.daemon = True
+            self.updater_thread.start()
+            print("Model updater thread started.")
+        except Exception as e:
+            print(f"Error starting model updater thread: {e}")
+        
+    def model_updater_thread(self):
+        """Background thread that periodically updates the AI models"""
+        try:
+            while True:
+                # Sleep for one hour between updates
+                time.sleep(3600)
+                
+                # Only update if we have enough data
+                if len(self.ai_system.readings) >= 100:
+                    print("Scheduled model update initiated.")
+                    self.ai_system.update_models()
+                    self.last_model_update = time.time()
+                    self.last_update_label.setText(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        except Exception as e:
+            print(f"Error in model updater thread: {e}")
+                
+    def update_soh(self, soh):
+        """Called when the AI system updates the SOH estimate"""
+        try:
+            self.soh_label.setText(f"{soh:.1f}%")
+            
+            # Color-code by health level
+            if soh < 50:
+                self.soh_label.setStyleSheet("color: red;")
+            elif soh < 80:
+                self.soh_label.setStyleSheet("color: orange;")
+            else:
+                self.soh_label.setStyleSheet("color: green;")
+        except Exception as e:
+            print(f"Error updating SOH: {e}")
+            
+    def update_anomaly(self, score, is_anomaly):
+        """Called when the AI system detects an anomaly"""
+        # Additional processing can be done here
+        pass
+        
+    def model_updated(self):
+        """Called when the AI model is updated"""
+        try:
+            self.model_status_label.setText("UPDATED")
+            self.model_status_label.setStyleSheet("color: green; font-weight: bold;")
+            self.last_update_label.setText(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        except Exception as e:
+            print(f"Error in model_updated: {e}")
+        
+    def log_event(self, message):
+        """Log a system event"""
+        self.log_viewer.add_log_entry(message)
+
+    def closeEvent(self, event):
+        """Clean up when closing the application - match second script logic"""
+        try:
+            # Reset kill switch to safe state (HIGH) like in second script
+            set_kill_switch(1)  # Leave line HIGH (safe) on exit
+            
+            # Save AI model data
+            self.ai_system.save_models()
+            self.log_event("System shutdown - models saved")
+            
+            event.accept()
+        except Exception as e:
+            print(f"Error during shutdown: {e}")
+
+
+# Main execution block with error handling
+if __name__ == "__main__":
+    try:
+        print("Starting application...")
+        app = QApplication(sys.argv)
+        w = MainWindow()
+        w.show()
+        print("Application running.")
+        sys.exit(app.exec_())
+    except Exception as e:
+        print(f"CRITICAL ERROR: {e}")
+        # Try to save a crash log
+        try:
+            with open("battery_monitor_crash.log", "a") as f:
+                f.write(f"[{datetime.datetime.now()}] CRASH: {e}\n")
+        except:
+            pass
+        sys.exit(1) Killswitch Control
+        self.discharge_btn = QPushButton("Toggle Relay")
+        self.discharge_btn.setCheckable(True)
+        self.discharge_btn.toggled.connect(self.toggle_discharge)
+        self.main_layout.addWidget(self.discharge_btn)
         
         # SOC plot in main tab
         self.canvas = BatteryCanvas()
@@ -610,23 +907,18 @@ class MainWindow(QMainWindow):
         lbl_batt_v  = QLabel("Battery Voltage (V):"); lbl_batt_v.setFont(big_bold)
         lbl_curr    = QLabel("Load Current (A):");    lbl_curr.setFont(big_bold)
         lbl_temp    = QLabel("Temperature (°F):");    lbl_temp.setFont(big_bold)
-        lbl_v_stat  = QLabel("Voltage Status:");      lbl_v_stat.setFont(big_bold)
-        lbl_i_stat  = QLabel("Current Status:");      lbl_i_stat.setFont(big_bold)
-        lbl_t_stat  = QLabel("Temperature Status:");  lbl_t_stat.setFont(big_bold)
+        lbl_stat    = QLabel("Relay Status:");        lbl_stat.setFont(big_bold)
 
         self.voltage_label  = QLabel("N/A"); self.voltage_label.setFont(big)
         self.current_label  = QLabel("N/A"); self.current_label.setFont(big)
         self.temp_label     = QLabel("N/A"); self.temp_label.setFont(big)
-        self.voltage_status = QLabel("OK");  self.voltage_status.setFont(big)
-        self.current_status = QLabel("OK");  self.current_status.setFont(big)
-        self.temp_status    = QLabel("OK");  self.temp_status.setFont(big)
+        self.kill_status    = QLabel("Charging"); self.kill_status.setFont(big)
+        self.kill_status.setStyleSheet("color:green;")
 
         form.addRow(lbl_batt_v, self.voltage_label)
-        form.addRow(lbl_v_stat, self.voltage_status)
         form.addRow(lbl_curr,   self.current_label)
-        form.addRow(lbl_i_stat, self.current_status)
         form.addRow(lbl_temp,   self.temp_label)
-        form.addRow(lbl_t_stat, self.temp_status)
+        form.addRow(lbl_stat,   self.kill_status)
 
         box.setLayout(form)
         self.main_layout.addWidget(box)
@@ -690,320 +982,19 @@ class MainWindow(QMainWindow):
             self.spi = None
             self.log_viewer.add_log_entry("ERROR: SPI initialization failed, using simulated values")
 
-        # battery pack bounds
+        # battery pack bounds - Same as second script
         self.volt_min = 11.2
         self.volt_max = 14.6
 
-        # safety thresholds
-        self.MAX_TEMP    = 50.0;  self.RED_TEMP    = 80.0
-        self.MAX_CURRENT = 2.5;   self.RED_CURRENT = 4.5
-        self.MAX_VOLTAGE = 14.0;  self.RED_VOLTAGE = 14.5
+        # safety thresholds - Same as second script
+        self.MAX_TEMP    = 50.0;  self.RED_TEMP    = 60.0
+        self.MAX_CURRENT = 2.5;   self.RED_CURRENT = 3.0
+        self.MAX_VOLTAGE = 14.0;  self.RED_VOLTAGE = 15.0
 
-        # rolling buffers
+        # rolling buffers - Same as second script
         size = 5
         self.buf_t = deque(maxlen=size)
         self.buf_i = deque(maxlen=size)
         self.buf_v = deque(maxlen=size)
         
-        # State tracking
-        self.last_was_red = False
-        self.last_was_yellow = False
-        
-        # Initialize AI system
-        print("Initializing AI system...")
-        self.ai_system = BatteryManagementAI(
-            voltage_pin=2,
-            current_pin=4,
-            temp_pin=3,
-            voltage_red_limit=self.RED_VOLTAGE,
-            voltage_yellow_limit=self.MAX_VOLTAGE,
-            current_red_limit=self.RED_CURRENT,
-            current_yellow_limit=self.MAX_CURRENT,
-            temp_red_limit=self.RED_TEMP,
-            temp_yellow_limit=self.MAX_TEMP,
-            sample_rate=0.5,
-            history_size=5000  # Reduced from 10000 for better performance
-        )
-        
-        # Connect AI signals
-        self.ai_system.signals.soh_updated.connect(self.update_soh)
-        self.ai_system.signals.anomaly_detected.connect(self.update_anomaly)
-        self.ai_system.signals.model_updated.connect(self.model_updated)
-        self.ai_system.signals.log_event.connect(self.log_event)
-        
-        # Set last model update time
-        self.last_model_update = time.time()
-        
-        # CSV data logging setup
-        self.csv_log_dir = os.path.join(os.path.expanduser("~"), "battery_data_logs")
-        if not os.path.exists(self.csv_log_dir):
-            try:
-                os.makedirs(self.csv_log_dir)
-                print(f"Created CSV log directory: {self.csv_log_dir}")
-            except Exception as e:
-                print(f"Error creating CSV log directory: {e}")
-                self.csv_log_dir = "."  # Fallback to current directory
-        
-        # Variables to track state
-        self.last_csv_log_time = time.time()
-        self.csv_log_interval = 300  # 5 minutes in seconds
-        
-        # Start background thread for model updates
-        self.start_model_updater()
-        
-        # Log system startup
-        self.log_event("Smart Battery Monitor System started")
-        
-        # start periodic updates (every 1 second - increased from 0.5 for better performance)
-        self.sample_dt = 1.0
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_readings)
-        self.timer.start(int(self.sample_dt * 1000))
-        
-        print("Main window initialization complete.")
-
-    def read_raw(self, ch):
-        """Read raw ADC value with dummy mode fallback"""
-        if not (0 <= ch <= 7):
-            return 0
-            
-        if self.spi is None:
-            # Dummy mode - simulate reasonable values with some noise
-            import random
-            if ch == 2:  # Voltage channel
-                return int((12.5 + random.uniform(-0.3, 0.3)) * (1024.0 / self.volt_max))
-            elif ch == 0:  # Temperature channel
-                temp_c = 35 + random.uniform(-5, 5)  # ~35°C with noise
-                v_out = (temp_c - 25) / 100 + 0.75
-                return int(v_out * 1024.0 / 5.0)
-            elif ch == 1:  # Current channel
-                current = 2.0 + random.uniform(-0.5, 0.5)  # ~2A with noise
-                v_out = 2.5 + current * 0.1375
-                return int(v_out * 1024.0 / 5.0)
-            else:
-                return random.randint(0, 1023)
-        
-        try:
-            r = self.spi.xfer2([1, (8 + ch) << 4, 0])
-            return ((r[1] & 3) << 8) + r[2]
-        except Exception as e:
-            print(f"Error reading ADC: {e}")
-            # Fall back to dummy values if SPI fails
-            return self.read_raw(ch)
-
-    @staticmethod
-    def colour_for(val, buf, max_l, red_l) -> str:
-        if val > red_l:
-            return "red"
-        if len(buf) == buf.maxlen and sum(buf)/len(buf) > max_l:
-            return "orange"
-        return "green"
-
-    def update_readings(self):
-        try:
-            # --- read sensors ---
-            r_t = self.read_raw(0)
-            v_t = r_t / 1024.0 * 5.0
-            t_c = 100*(v_t - 0.75) + 25
-            t_f = t_c * 9/5 + 32
-            self.temp_label.setText(f"{t_f:.1f} °F")
-
-            r_i = self.read_raw(1)
-            v_i = r_i / 1024.0 * 5.0
-            i_a = (v_i - 2.5)/0.1375 - 1
-            self.current_label.setText(f"{i_a:.2f} A")
-
-            r_v = self.read_raw(2)
-            v_s = r_v / 1024.0 * 5.0
-            b_v = v_s * (self.volt_max / 5.0)
-            self.voltage_label.setText(f"{b_v:.2f} V")
-
-            # SOC calculation
-            soc = (b_v - self.volt_min)/(self.volt_max - self.volt_min)*100
-            soc = max(0, min(100, soc))
-            self.canvas.update_soc(soc, self.sample_dt)
-
-            # safety logic - basic thresholds
-            red = (t_c > self.RED_TEMP) or (i_a > self.RED_CURRENT) or (b_v > self.RED_VOLTAGE)
-            self.buf_t.append(t_c); self.buf_i.append(i_a); self.buf_v.append(b_v)
-
-            if len(self.buf_t) == self.buf_t.maxlen:
-                at = sum(self.buf_t)/len(self.buf_t)
-                ai = sum(self.buf_i)/len(self.buf_i)
-                av = sum(self.buf_v)/len(self.buf_v)
-                yellow = (at > self.MAX_TEMP) or (ai > self.MAX_CURRENT) or (av > self.MAX_VOLTAGE)
-            else:
-                yellow = False
-
-            # AI processing
-            anomaly_score, is_anomaly, soh = self.ai_system.add_reading(b_v, i_a, t_c)
-            
-            # Update SOH display if we have a new one
-            self.soh_label.setText(f"{soh:.1f}%")
-            
-            # Update anomaly score display
-            self.anomaly_label.setText(f"{anomaly_score:.3f}")
-            if is_anomaly:
-                self.anomaly_label.setStyleSheet("color: red; font-weight: bold;")
-                self.ai_status_label.setText("ANOMALY DETECTED")
-                self.ai_status_label.setStyleSheet("color: red; font-weight: bold;")
-                self.log_event(f"ANOMALY DETECTED! Score: {anomaly_score:.3f}")
-            elif anomaly_score > 0.5:
-                self.anomaly_label.setStyleSheet("color: orange;")
-                self.ai_status_label.setText("UNUSUAL PATTERN")
-                self.ai_status_label.setStyleSheet("color: orange;")
-            else:
-                self.anomaly_label.setStyleSheet("color: green;")
-                self.ai_status_label.setText("NORMAL")
-                self.ai_status_label.setStyleSheet("color: green;")
-            
-            # Combined safety decision (traditional + AI)
-            combined_red = red or is_anomaly
-            combined_yellow = yellow or (anomaly_score > 0.5)
-            
-            # Update safety status displays
-            col_t = self.colour_for(t_c, self.buf_t, self.MAX_TEMP, self.RED_TEMP)
-            col_i = self.colour_for(i_a, self.buf_i, self.MAX_CURRENT, self.RED_CURRENT)
-            col_v = self.colour_for(b_v, self.buf_v, self.MAX_VOLTAGE, self.RED_VOLTAGE)
-
-            self.temp_label.setStyleSheet(f"color:{col_t};")
-            self.current_label.setStyleSheet(f"color:{col_i};")
-            self.voltage_label.setStyleSheet(f"color:{col_v};")
-
-            self.temp_status.setText(col_t.upper())
-            self.current_status.setText(col_i.upper())
-            self.voltage_status.setText(col_v.upper())
-            
-            # Update AI charts
-            self.anomaly_canvas.update_score(anomaly_score, self.sample_dt)
-            self.soh_canvas.update_soh(soh, self.sample_dt)
-            
-            # Update data points count
-            self.data_points_label.setText(str(len(self.ai_system.readings)))
-            
-            # Set kill switch based on combined safety decision
-            set_kill_switch(not combined_red)
-            
-            # Log severe safety events
-            if combined_red and not self.last_was_red:
-                self.log_event(f"EMERGENCY SHUTDOWN - V:{b_v:.2f}V, I:{i_a:.2f}A, T:{t_c:.1f}°C, Anomaly:{anomaly_score:.3f}")
-            elif combined_yellow and not self.last_was_yellow:
-                self.log_event(f"WARNING CONDITION - V:{b_v:.2f}V, I:{i_a:.2f}A, T:{t_c:.1f}°C, Anomaly:{anomaly_score:.3f}")
-                
-            self.last_was_red = combined_red
-            self.last_was_yellow = combined_yellow
-            
-        except Exception as e:
-            print(f"Error in update_readings: {e}")
-            self.log_event(f"Error updating readings: {e}")
-
-    \
-    
-    def start_model_updater(self):
-        """Start background thread for model updates"""
-        try:
-            self.updater_thread = threading.Thread(target=self.model_updater_thread)
-            self.updater_thread.daemon = True
-            self.updater_thread.start()
-            print("Model updater thread started.")
-        except Exception as e:
-            print(f"Error starting model updater thread: {e}")
-        
-    def model_updater_thread(self):
-        """Background thread that periodically updates the AI models"""
-        try:
-            while True:
-                # Sleep for one hour between updates
-                time.sleep(3600)
-                
-                # Only update if we have enough data
-                if len(self.ai_system.readings) >= 100:
-                    print("Scheduled model update initiated.")
-                    self.ai_system.update_models()
-                    self.last_model_update = time.time()
-                    self.last_update_label.setText(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        except Exception as e:
-            print(f"Error in model updater thread: {e}")
-                
-    def update_soh(self, soh):
-        """Called when the AI system updates the SOH estimate"""
-        try:
-            self.soh_label.setText(f"{soh:.1f}%")
-            
-            # Color-code by health level
-            if soh < 50:
-                self.soh_label.setStyleSheet("color: red;")
-            elif soh < 80:
-                self.soh_label.setStyleSheet("color: orange;")
-            else:
-                self.soh_label.setStyleSheet("color: green;")
-        except Exception as e:
-            print(f"Error updating SOH: {e}")
-            
-    def update_anomaly(self, score, is_anomaly):
-        """Called when the AI system detects an anomaly"""
-        # Additional processing can be done here
-        pass
-        
-    def model_updated(self):
-        """Called when the AI model is updated"""
-        try:
-            self.model_status_label.setText("UPDATED")
-            self.model_status_label.setStyleSheet("color: green; font-weight: bold;")
-            self.last_update_label.setText(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        except Exception as e:
-            print(f"Error in model_updated: {e}")
-        
-    def log_event(self, message):
-        """Log a system event"""
-        self.log_viewer.add_log_entry(message)
-
-    def closeEvent(self, event):
-        """Clean up when closing the application"""
-        try:
-            # Reset kill switch
-            set_kill_switch(False)
-            
-            # Write final CSV log entry before exit
-            try:
-                self.write_csv_log(
-                    timestamp=datetime.datetime.now(),
-                    voltage=float(self.voltage_label.text().split()[0]),
-                    current=float(self.current_label.text().split()[0]),
-                    temperature=float(self.temp_label.text().split()[0]),
-                    soc=float(self.canvas.soc_history[-1]),
-                    soh=float(self.soh_label.text().replace('%', '')),
-                    anomaly_score=float(self.anomaly_label.text()),
-                    is_anomaly=(self.ai_status_label.text() == "ANOMALY DETECTED"),
-                    killswitch_status=False  # We're turning it off
-                )
-            except Exception as e:
-                print(f"Error writing final CSV log: {e}")
-            
-            # Save AI model data
-            self.ai_system.save_models()
-            self.log_event("System shutdown - models saved")
-            
-            event.accept()
-        except Exception as e:
-            print(f"Error during shutdown: {e}")
-
-
-# Main execution block with error handling
-if __name__ == "__main__":
-    try:
-        print("Starting application...")
-        app = QApplication(sys.argv)
-        w = MainWindow()
-        w.show()
-        print("Application running.")
-        sys.exit(app.exec_())
-    except Exception as e:
-        print(f"CRITICAL ERROR: {e}")
-        # Try to save a crash log
-        try:
-            with open("battery_monitor_crash.log", "a") as f:
-                f.write(f"[{datetime.datetime.now()}] CRASH: {e}\n")
-        except:
-            pass
-        sys.exit(1)
+        # Manual

@@ -72,7 +72,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.canvas)
 
         # manual discharge button
-        self.discharge_btn = QPushButton("Decharge")
+        self.discharge_btn = QPushButton("Toggle Relay")
         self.discharge_btn.setCheckable(True)
         self.discharge_btn.toggled.connect(self.toggle_discharge)
         layout.addWidget(self.discharge_btn)
@@ -152,7 +152,6 @@ class MainWindow(QMainWindow):
 
     def toggle_discharge(self, checked):
         self.manual_discharge = checked
-        self.discharge_btn.setText("Charge" if checked else "Decharge")
 
     def update_readings(self):
         # read sensors

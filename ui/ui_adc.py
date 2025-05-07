@@ -5,20 +5,20 @@ import gpiod
 from collections import deque
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
-    QLabel, QGroupBox, QFormLayout, QPushButton, QHBoxLayout   # added QHBoxLayout
+    QLabel, QGroupBox, QFormLayout, QPushButton, QHBoxLayout  # QHBoxLayout left in (no harm)
 )
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QFont
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-#GPIO setup: line 26 as open‑drain output, default LOW
+#GPIO setup: line 26 as open‑drain output, default HIGH (safe/charging)
 chip      = gpiod.Chip('gpiochip0')
 kill_line = chip.get_line(26)
 kill_line.request(
     consumer="battery_monitor",
     type=gpiod.LINE_REQ_DIR_OUT,
-    default_vals=[0]
+    default_vals=[1]
 )
 
 class BatteryCanvas(FigureCanvas):
@@ -77,7 +77,7 @@ class MainWindow(QMainWindow):
         self.discharge_btn.toggled.connect(self.toggle_discharge)
         layout.addWidget(self.discharge_btn)
 
-        # status label (now placed beside sensor box)
+        # status label (will sit below sensor readings)
         big_bold_status = QFont()
         big_bold_status.setPointSize(30)
         big_bold_status.setBold(True)
@@ -85,38 +85,28 @@ class MainWindow(QMainWindow):
         self.kill_status.setFont(big_bold_status)
         self.kill_status.setStyleSheet("color:green;")
 
-        # ADC readings + status
+        # ADC readings
         box = QGroupBox("Local ADC Readings")
         form = QFormLayout()
-        big = QFont()
-        big.setPointSize(30)
-        big_bold  = QFont()
-        big_bold.setPointSize(30)
-        big_bold.setBold(True)
+        big = QFont(); big.setPointSize(30)
+        big_bold = QFont(); big_bold.setPointSize(30); big_bold.setBold(True)
 
-        form = QFormLayout()
-        lbl_batt_v  = QLabel("Battery Voltage:"); lbl_batt_v.setFont(big_bold)
-        lbl_curr    = QLabel("Load Current:");    lbl_curr.setFont(big_bold)
-        lbl_temp    = QLabel("Temperature:");     lbl_temp.setFont(big_bold)
+        lbl_batt_v = QLabel("Battery Voltage:"); lbl_batt_v.setFont(big_bold)
+        lbl_curr   = QLabel("Load Current:");    lbl_curr.setFont(big_bold)
+        lbl_temp   = QLabel("Temperature:");     lbl_temp.setFont(big_bold)
 
-        self.voltage_label  = QLabel("N/A"); self.voltage_label.setFont(big)
-        self.current_label  = QLabel("N/A"); self.current_label.setFont(big)
-        self.temp_label     = QLabel("N/A"); self.temp_label.setFont(big)
+        self.voltage_label = QLabel("N/A"); self.voltage_label.setFont(big)
+        self.current_label = QLabel("N/A"); self.current_label.setFont(big)
+        self.temp_label    = QLabel("N/A"); self.temp_label.setFont(big)
 
-        # put them into the form
         form.addRow(lbl_batt_v, self.voltage_label)
-#        form.addRow(lbl_v_stat, self.voltage_status)
         form.addRow(lbl_curr,   self.current_label)
-#        form.addRow(lbl_i_stat, self.current_status)
         form.addRow(lbl_temp,   self.temp_label)
-#        form.addRow(lbl_t_stat, self.temp_status)
         box.setLayout(form)
 
-        # side‑by‑side layout for readings + status
-        row = QHBoxLayout()
-        row.addWidget(box)
-        row.addWidget(self.kill_status)
-        layout.addLayout(row)
+        # sensor box followed by status label (status at bottom)
+        layout.addWidget(box)
+        layout.addWidget(self.kill_status)
 
         # SPI/MCP3008 setup
         self.spi = spidev.SpiDev()
@@ -125,13 +115,12 @@ class MainWindow(QMainWindow):
         self.spi.mode = 0b00
 
         # battery pack bounds (11.2–14.6V)
-        self.volt_min = 11.2  # UPDATE LATER IF NEEDED
-        self.volt_max = 14.6  # UPDATE LATER IF NEEDED
+        self.volt_min = 11.2;  self.volt_max = 14.6
 
         # safety thresholds
-        self.MAX_TEMP    = 50.0;  self.RED_TEMP    = 60.0  # UPDATE LATER IF NEEDED (celsius)
-        self.MAX_CURRENT = 2.5;   self.RED_CURRENT = 3.0  # UPDATE LATER IF NEEDED
-        self.MAX_VOLTAGE = 14.0;  self.RED_VOLTAGE = 15.0  # UPDATE LATER IF NEEDED
+        self.MAX_TEMP    = 50.0;  self.RED_TEMP    = 60.0
+        self.MAX_CURRENT = 2.5;   self.RED_CURRENT = 3.0
+        self.MAX_VOLTAGE = 14.0;  self.RED_VOLTAGE = 15.0
 
         # rolling buffers
         size = 5
@@ -142,7 +131,7 @@ class MainWindow(QMainWindow):
         # manual override flag
         self.manual_discharge = False
 
-        # start periodic updates
+        # periodic updates
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_readings)
         self.timer.start(1000)
@@ -154,7 +143,7 @@ class MainWindow(QMainWindow):
         return ((r[1] & 3) << 8) + r[2]
 
     @staticmethod
-    def colour_for(val, buf, max_l, red_l) -> str:
+    def colour_for(val, buf, max_l, red_l):
         if val > red_l:
             return "red"
         if len(buf) == buf.maxlen and sum(buf)/len(buf) > max_l:
@@ -163,47 +152,30 @@ class MainWindow(QMainWindow):
 
     def toggle_discharge(self, checked):
         self.manual_discharge = checked
-        # change button text so user knows it toggles back
         self.discharge_btn.setText("Charge" if checked else "Decharge")
 
     def update_readings(self):
-        # --- read sensors ---
-        r_t = self.read_raw(0)
-        v_t = r_t / 1024.0 * 5.0
-        t_c = 100*(v_t - 0.75) + 25
-        t_f = t_c * 9/5 + 32
+        # read sensors
+        r_t = self.read_raw(0); v_t = r_t / 1024.0 * 5.0
+        t_c = 100*(v_t - 0.75) + 25; t_f = t_c * 9/5 + 32
         self.temp_label.setText(f"{t_f:.1f} °F")
 
-        r_i = self.read_raw(1)
-        v_i = r_i / 1024.0 * 5.0
+        r_i = self.read_raw(1); v_i = r_i / 1024.0 * 5.0
         i_a = (v_i - 2.5)/0.1375 - 1
         self.current_label.setText(f"{i_a:.2f} A")
 
-        r_v = self.read_raw(2)
-        v_s = r_v / 1024.0 * 5.0
+        r_v = self.read_raw(2); v_s = r_v / 1024.0 * 5.0
         b_v = v_s * (self.volt_max / 5.0)
         self.voltage_label.setText(f"{b_v:.2f} V")
 
-        # SOC
+        # SOC plot
         soc = (b_v - self.volt_min)/(self.volt_max - self.volt_min)*100
         soc = max(0, min(100, soc))
         self.canvas.update_soc(soc, 1)
 
-        # safety logic
+        # safety checks
         red = (t_c > self.RED_TEMP) or (i_a > self.RED_CURRENT) or (b_v > self.RED_VOLTAGE)
         self.buf_t.append(t_c); self.buf_i.append(i_a); self.buf_v.append(b_v)
-
-        if len(self.buf_t) == self.buf_t.maxlen:
-            at = sum(self.buf_t)/len(self.buf_t)
-            ai = sum(self.buf_i)/len(self.buf_i)
-            av = sum(self.buf_v)/len(self.buf_v)
-            yellow = (at > self.MAX_TEMP) or (ai > self.MAX_CURRENT) or (av > self.MAX_VOLTAGE)
-        else:
-            yellow = False
-
-        # drive kill‑switch: LOW (0 V) when safe, HIGH (3.3 V) when RED or manual
-        kill_state = int(red or self.manual_discharge)
-        kill_line.set_value(kill_state)
 
         col_t = self.colour_for(t_c, self.buf_t, self.MAX_TEMP,    self.RED_TEMP)
         col_i = self.colour_for(i_a, self.buf_i, self.MAX_CURRENT, self.RED_CURRENT)
@@ -213,8 +185,13 @@ class MainWindow(QMainWindow):
         self.current_label.setStyleSheet(f"color:{col_i};")
         self.voltage_label.setStyleSheet(f"color:{col_v};")
 
+        # drive GPIO 26 (ACTIVE‑LOW)
+        active = red or self.manual_discharge          # TRUE means want to discharge
+        kill_state = int(not active)                   # LOW when active, HIGH when safe
+        kill_line.set_value(kill_state)
+
         # update status label
-        if kill_state:
+        if active:
             self.kill_status.setText("Discharging")
             self.kill_status.setStyleSheet("color:red;")
         else:
@@ -222,8 +199,7 @@ class MainWindow(QMainWindow):
             self.kill_status.setStyleSheet("color:green;")
 
     def closeEvent(self, event):
-        # ensure kill‑switch goes LOW on exit
-        kill_line.set_value(0)
+        kill_line.set_value(1)  # leave line HIGH (safe) on exit
         event.accept()
 
 if __name__ == "__main__":

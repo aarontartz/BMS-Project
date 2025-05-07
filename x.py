@@ -593,28 +593,9 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.log_viewer, "System Log")
         
         # Manual Killswitch Control
-        """self.manual_killswitch_active = False
-        self.killswitch_box = QGroupBox("Emergency Killswitch")
-        killswitch_layout = QVBoxLayout()"""
         
         # Status indicator
-        """self.killswitch_status = QLabel("Killswitch Status: NORMAL")
-        self.killswitch_status.setFont(QFont("Arial", 14, QFont.Bold))
-        self.killswitch_status.setStyleSheet("color: green;")
-        killswitch_layout.addWidget(self.killswitch_status)"""
         
-        # Control button
-        """self.killswitch_button = QPushButton("EMERGENCY KILLSWITCH")
-        self.killswitch_button.setMinimumHeight(50)
-        self.killswitch_button.setFont(QFont("Arial", 14, QFont.Bold))
-        self.killswitch_button.setStyleSheet("background-color: red; color: white; font-weight: bold; padding: 10px;")
-        self.killswitch_button.clicked.connect(self.toggle_killswitch)
-        killswitch_layout.addWidget(self.killswitch_button)"""
-        
-"""        killswitch_layout.addWidget(QLabel("Press to manually activate/deactivate the killswitch"))
-"""        
-        """self.killswitch_box.setLayout(killswitch_layout)
-        self.main_layout.addWidget(self.killswitch_box)"""
         
         # SOC plot in main tab
         self.canvas = BatteryCanvas()
@@ -791,11 +772,11 @@ class MainWindow(QMainWindow):
             import random
             if ch == 2:  # Voltage channel
                 return int((12.5 + random.uniform(-0.3, 0.3)) * (1024.0 / self.volt_max))
-            elif ch == 3:  # Temperature channel
+            elif ch == 0:  # Temperature channel
                 temp_c = 35 + random.uniform(-5, 5)  # ~35°C with noise
                 v_out = (temp_c - 25) / 100 + 0.75
                 return int(v_out * 1024.0 / 5.0)
-            elif ch == 4:  # Current channel
+            elif ch == 1:  # Current channel
                 current = 2.0 + random.uniform(-0.5, 0.5)  # ~2A with noise
                 v_out = 2.5 + current * 0.1375
                 return int(v_out * 1024.0 / 5.0)
@@ -821,13 +802,13 @@ class MainWindow(QMainWindow):
     def update_readings(self):
         try:
             # --- read sensors ---
-            r_t = self.read_raw(3)
+            r_t = self.read_raw(0)
             v_t = r_t / 1024.0 * 5.0
             t_c = 100*(v_t - 0.75) + 25
             t_f = t_c * 9/5 + 32
             self.temp_label.setText(f"{t_f:.1f} °F")
 
-            r_i = self.read_raw(4)
+            r_i = self.read_raw(1)
             v_i = r_i / 1024.0 * 5.0
             i_a = (v_i - 2.5)/0.1375 - 1
             self.current_label.setText(f"{i_a:.2f} A")
@@ -916,30 +897,7 @@ class MainWindow(QMainWindow):
             print(f"Error in update_readings: {e}")
             self.log_event(f"Error updating readings: {e}")
 
-    """def toggle_killswitch(self):
-        """Toggle the killswitch on/off"""
-        try:
-            # Toggle state
-            self.manual_killswitch_active = not self.manual_killswitch_active
-            
-            # Set killswitch according to new state
-            set_kill_switch(self.manual_killswitch_active)
-            
-            # Update UI
-            if self.manual_killswitch_active:
-                self.killswitch_status.setText("Killswitch Status: MANUALLY ENGAGED")
-                self.killswitch_status.setStyleSheet("color: red; font-weight: bold;")
-                self.killswitch_button.setText("RELEASE KILLSWITCH")
-                self.log_event("MANUAL KILLSWITCH ENGAGED by user")
-            else:
-                self.killswitch_status.setText("Killswitch Status: NORMAL")
-                self.killswitch_status.setStyleSheet("color: green;")
-                self.killswitch_button.setText("EMERGENCY KILLSWITCH")
-                self.log_event("MANUAL KILLSWITCH RELEASED by user")
-                
-        except Exception as e:
-            print(f"Error toggling killswitch: {e}")
-            self.log_event(f"Error toggling killswitch: {e}")"""
+    \
     
     def start_model_updater(self):
         """Start background thread for model updates"""
